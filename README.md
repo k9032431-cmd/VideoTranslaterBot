@@ -29,45 +29,65 @@
 - **Субтитры.** Не больше двух строк по 42 символа (для китайского, японского и корейского по 16) и не дольше 7 секунд на экране. Длинные фразы делятся по знакам препинания.
 - **Озвучка.** Для неё перевод делается с учётом длительности каждой фразы. Каждая фраза ставится точно на свой таймкод. Если не влезает, она немного ускоряется (максимум в 1.35 раза, чтобы звучало естественно). Оригинал остаётся тихим фоном, как в классическом закадровом переводе.
 
-## Запуск
+## Установка на сервер одной командой
 
-### 1. Подготовка
+Подойдёт любой VPS с **Ubuntu 22.04 / 24.04** или **Debian 12**. Заранее нужны:
 
-- Токен бота: создать бота у [@BotFather](https://t.me/BotFather).
-- Ключ OpenAI: <https://platform.openai.com/api-keys>.
+- токен бота: создать бота у [@BotFather](https://t.me/BotFather);
+- ключ OpenAI: <https://platform.openai.com/api-keys>;
+- свой Telegram id (по желанию): узнать у [@userinfobot](https://t.me/userinfobot).
 
-```bash
-cp .env.example .env
-# заполнить BOT_TOKEN, OPENAI_API_KEY, а лучше и ALLOWED_USER_IDS
-```
-
-### 2a. Через Docker (рекомендуется)
+Зайти на сервер под root и выполнить:
 
 ```bash
-docker compose up -d --build
-docker compose logs -f bot
+bash <(curl -fsSL https://raw.githubusercontent.com/k9032431-cmd/VideoTranslaterBot/main/install.sh)
 ```
 
-### 2b. Без Docker
+Скрипт сам установит ffmpeg, Python и шрифты, скачает бота, спросит токен, ключ и id (и сразу проверит, что они рабочие), а потом запустит бота как службу. Бот запускается вместе с сервером и поднимается сам, если упадёт.
 
-Нужны Python 3.11+ и ffmpeg (`sudo apt install ffmpeg`).
+## Обновление одной командой
 
 ```bash
-python -m venv .venv && . .venv/bin/activate
-pip install -r requirements.txt
-python -m bot
+vtbot update
 ```
+
+Скачивает новую версию, ставит новые зависимости и перезапускает бота. Настройки (`.env`) и данные сохраняются, а настройки, которые появились в новой версии, дописываются в `.env` автоматически. Если новая версия не запустилась, скрипт сам возвращает предыдущую.
+
+## Управление
+
+| Команда | Что делает |
+|---|---|
+| `vtbot update` | обновить до новой версии |
+| `vtbot status` | версия и состояние |
+| `vtbot logs` | логи в реальном времени (выход — Ctrl+C) |
+| `vtbot restart` / `stop` / `start` | перезапустить / остановить / запустить |
+| `vtbot config` | поменять токен, ключ OpenAI, список пользователей |
+| `vtbot bigfiles` | включить файлы до 2 ГБ (см. ниже) |
+| `vtbot uninstall` | удалить бота |
+
+Бот ставится в `/opt/videotranslaterbot`, настройки лежат в `/opt/videotranslaterbot/.env`. Остальные параметры (голос, модели, лимиты) можно поменять там, после чего выполнить `vtbot restart`.
 
 ### Большие файлы (фильмы до 2 ГБ)
 
 Обычный Telegram Bot API даёт боту скачивать файлы **до 20 МБ** и отправлять **до 50 МБ**. Для фильмов нужен свой локальный сервер Bot API:
 
 1. Получить `api_id` и `api_hash` на <https://my.telegram.org> → API development tools.
-2. В `.env` заполнить `TELEGRAM_API_ID`, `TELEGRAM_API_HASH` и раскомментировать `TELEGRAM_API_URL=http://telegram-bot-api:8081`.
-3. Если бот раньше работал через обычный API, один раз выполнить `https://api.telegram.org/bot<TOKEN>/logOut`.
-4. `docker compose --profile bigfiles up -d --build`.
+2. Выполнить `vtbot bigfiles` и ввести их. Скрипт поставит Docker, запустит сервер и переключит на него бота.
 
 Если готовое видео всё равно не помещается в лимит, бот пришлёт отдельно дорожку озвучки и субтитры.
+
+## Другие способы запуска
+
+**Docker Compose:** `cp .env.example .env`, заполнить `.env`, затем `docker compose up -d --build`. Для файлов до 2 ГБ: заполнить `TELEGRAM_API_ID` и `TELEGRAM_API_HASH`, раскомментировать `TELEGRAM_API_URL` и запустить `docker compose --profile bigfiles up -d --build`.
+
+**Вручную:** нужны Python 3.10–3.14 и ffmpeg.
+
+```bash
+python3 -m venv venv && . venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env   # заполнить
+python -m bot
+```
 
 ## Сколько это стоит (OpenAI, примерно)
 
@@ -102,6 +122,7 @@ pytest
 ## Структура
 
 ```
+install.sh           установка / обновление / управление (команда vtbot)
 bot/
   __main__.py        запуск
   config.py          настройки из .env
