@@ -71,8 +71,8 @@ class FakeJobs:
 @pytest.fixture
 async def env(tmp_path: Path):
     config = Config(
-        bot_token="42:TEST", openai_api_key="x", openai_base_url=None, telegram_api_url=None,
-        telegram_api_local=True, transcribe_model="w", translate_model="m", tts_model="t", tts_voice="v",
+        bot_token="42:TEST", provider="openai", ai_api_key="x", ai_base_url=None, telegram_api_url=None,
+        telegram_api_local=True, transcribe_model="w", translate_model="m", translate_reasoning_effort="", tts_engine="openai", tts_model="t", tts_voice="v", tts_gender="male",
         allowed_user_ids=frozenset(), max_video_minutes=180, max_concurrent_jobs=1, original_volume=0.2,
         data_dir=tmp_path,
     )

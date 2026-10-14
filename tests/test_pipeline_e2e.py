@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 from bot.config import Config
-from bot.pipeline import media
+from bot.pipeline import dubbing, media
 from bot.pipeline.job import JobParams, NoSpeechError, SameLanguageError, run_job
 
 pytestmark = [
@@ -66,11 +66,13 @@ class FakeOpenAI:
         return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=content))])
 
 
-def _config(tmp: Path) -> Config:
+def _config(tmp: Path, tts_engine: str = "openai") -> Config:
     return Config(
-        bot_token="x", openai_api_key="x", openai_base_url=None, telegram_api_url=None,
-        telegram_api_local=True, transcribe_model="whisper-1", translate_model="m", tts_model="gpt-4o-mini-tts",
-        tts_voice="onyx", allowed_user_ids=frozenset(), max_video_minutes=180, max_concurrent_jobs=1,
+        bot_token="x", provider="openai", ai_api_key="x", ai_base_url=None,
+        telegram_api_url=None, telegram_api_local=True,
+        transcribe_model="whisper-1", translate_model="m", translate_reasoning_effort="",
+        tts_engine=tts_engine, tts_model="gpt-4o-mini-tts", tts_voice="onyx", tts_gender="female",
+        allowed_user_ids=frozenset(), max_video_minutes=180, max_concurrent_jobs=1,
         original_volume=0.25, data_dir=tmp,
     )
 
@@ -129,3 +131,38 @@ async def test_no_speech_detected(tmp_path: Path):
     client = FakeOpenAI(tmp_path, segments=[])
     with pytest.raises(NoSpeechError):
         await run_job(client, _config(tmp_path), JobParams(video, tmp_path, "ru", "en", "both"), _report)
+
+
+async def test_free_voice_with_edge_tts(tmp_path: Path, monkeypatch):
+    """The free mode voices lines with Microsoft Edge voices instead of OpenAI TTS."""
+    video = tmp_path / "in.mp4"
+    _make_video(video)
+    work = tmp_path / "work"
+    work.mkdir()
+    client = FakeOpenAI(tmp_path)
+    used_voices: list[str] = []
+    calls = {"n": 0}
+
+    class FakeCommunicate:
+        def __init__(self, text, voice):
+            used_voices.append(voice)
+
+        async def save(self, path):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise ConnectionError("flaky connection")  # first attempt fails → retried
+            Path(path).write_bytes(client.tts_sample.read_bytes())
+
+    monkeypatch.setattr(dubbing.edge_tts, "Communicate", FakeCommunicate)
+    monkeypatch.setattr(dubbing.asyncio, "sleep", _no_sleep)
+
+    result = await run_job(client, _config(tmp_path, "edge"), JobParams(video, work, "ru", "en", "voice"), _report)
+
+    assert client.tts_inputs == []  # OpenAI TTS not used
+    assert set(used_voices) == {"en-US-EmmaMultilingualNeural"}  # female English voice
+    assert len(used_voices) == 3  # 2 lines + 1 retry
+    assert result.video and abs(await media.duration(work / "dub.wav") - DURATION) < 0.05
+
+
+async def _no_sleep(_):
+    pass

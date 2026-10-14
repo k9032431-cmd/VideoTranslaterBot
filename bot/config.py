@@ -6,6 +6,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+
+# Defaults per provider: (base_url, transcribe model, translate model, reasoning effort, tts engine)
+PROVIDER_DEFAULTS = {
+    # Free: Groq (Whisper large-v3 + GPT-OSS) and Microsoft Edge voices.
+    "free": (GROQ_BASE_URL, "whisper-large-v3", "openai/gpt-oss-120b", "low", "edge"),
+    "openai": (None, "whisper-1", "gpt-5.4", "", "openai"),
+}
+
 
 def _int(name: str, default: int) -> int:
     value = os.getenv(name, "").strip()
@@ -17,6 +26,10 @@ def _float(name: str, default: float) -> float:
     return float(value) if value else default
 
 
+def _str(name: str, default: str) -> str:
+    return os.getenv(name, "").strip() or default
+
+
 def _ids(name: str) -> frozenset[int]:
     raw = os.getenv(name, "")
     return frozenset(int(x) for x in raw.replace(";", ",").split(",") if x.strip())
@@ -25,8 +38,9 @@ def _ids(name: str) -> frozenset[int]:
 @dataclass(frozen=True)
 class Config:
     bot_token: str
-    openai_api_key: str
-    openai_base_url: str | None
+    provider: str  # free | openai
+    ai_api_key: str
+    ai_base_url: str | None
 
     # Local Telegram Bot API server (lifts the 20 MB download / 50 MB upload limits to 2 GB).
     telegram_api_url: str | None
@@ -34,8 +48,11 @@ class Config:
 
     transcribe_model: str
     translate_model: str
+    translate_reasoning_effort: str  # "" = model default
+    tts_engine: str  # edge | openai
     tts_model: str
-    tts_voice: str
+    tts_voice: str  # OpenAI voice name
+    tts_gender: str  # male | female (Edge voices)
 
     allowed_user_ids: frozenset[int]
     max_video_minutes: int
@@ -61,22 +78,39 @@ class Config:
 
 def load_config() -> Config:
     token = os.getenv("BOT_TOKEN", "").strip()
-    api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if not token:
         raise SystemExit("BOT_TOKEN is not set (see .env.example)")
+
+    provider = _str("PROVIDER", "free").lower()
+    if provider not in PROVIDER_DEFAULTS:
+        raise SystemExit(f"PROVIDER must be one of: {', '.join(PROVIDER_DEFAULTS)}")
+    base_url, transcribe_model, translate_model, effort, tts_engine = PROVIDER_DEFAULTS[provider]
+
+    key_name = "GROQ_API_KEY" if provider == "free" else "OPENAI_API_KEY"
+    api_key = os.getenv(key_name, "").strip()
     if not api_key:
-        raise SystemExit("OPENAI_API_KEY is not set (see .env.example)")
+        raise SystemExit(f"{key_name} is not set (see .env.example)")
+
+    tts_engine = _str("TTS_ENGINE", tts_engine).lower()
+    if tts_engine not in ("edge", "openai"):
+        raise SystemExit("TTS_ENGINE must be 'edge' or 'openai'")
+    if tts_engine == "openai" and provider != "openai":
+        raise SystemExit("TTS_ENGINE=openai needs PROVIDER=openai")
 
     return Config(
         bot_token=token,
-        openai_api_key=api_key,
-        openai_base_url=os.getenv("OPENAI_BASE_URL") or None,
+        provider=provider,
+        ai_api_key=api_key,
+        ai_base_url=os.getenv("OPENAI_BASE_URL") or base_url,
         telegram_api_url=os.getenv("TELEGRAM_API_URL") or None,
         telegram_api_local=os.getenv("TELEGRAM_API_LOCAL", "1") == "1",
-        transcribe_model=os.getenv("TRANSCRIBE_MODEL", "whisper-1"),
-        translate_model=os.getenv("TRANSLATE_MODEL", "gpt-5.4"),
-        tts_model=os.getenv("TTS_MODEL", "gpt-4o-mini-tts"),
-        tts_voice=os.getenv("TTS_VOICE", "onyx"),
+        transcribe_model=_str("TRANSCRIBE_MODEL", transcribe_model),
+        translate_model=_str("TRANSLATE_MODEL", translate_model),
+        translate_reasoning_effort=_str("TRANSLATE_REASONING_EFFORT", effort),
+        tts_engine=tts_engine,
+        tts_model=_str("TTS_MODEL", "gpt-4o-mini-tts"),
+        tts_voice=_str("TTS_VOICE", "onyx"),
+        tts_gender="female" if _str("TTS_GENDER", "male").lower() == "female" else "male",
         allowed_user_ids=_ids("ALLOWED_USER_IDS"),
         max_video_minutes=_int("MAX_VIDEO_MINUTES", 180),
         max_concurrent_jobs=_int("MAX_CONCURRENT_JOBS", 2),

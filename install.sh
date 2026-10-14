@@ -41,7 +41,7 @@ ask() {
     local prompt="$1" default="${2:-}" answer=""
     if [[ -n "$default" ]]; then prompt="$prompt [$default]"; fi
     if [[ -r /dev/tty ]]; then
-        read -r -p "$prompt: " answer </dev/tty || true
+        { read -r -p "$prompt: " answer </dev/tty; } 2>/dev/null || true
     fi
     printf '%s' "${answer:-$default}"
 }
@@ -49,8 +49,7 @@ ask() {
 ask_secret() {
     local prompt="$1" answer=""
     if [[ -r /dev/tty ]]; then
-        read -r -s -p "$prompt: " answer </dev/tty || true
-        echo >/dev/tty
+        { read -r -s -p "$prompt: " answer </dev/tty && echo >/dev/tty; } 2>/dev/null || true
     fi
     printf '%s' "$answer"
 }
@@ -155,14 +154,16 @@ check_bot_token() {
     return 1
 }
 
-check_openai_key() {
+check_api_key() {  # $1 = base url, $2 = key
     [[ "${VTBOT_SKIP_CHECKS:-0}" == 1 ]] && return 0
-    local base="${OPENAI_BASE_URL:-https://api.openai.com/v1}" code
+    local code
     code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 \
-        -H "Authorization: Bearer $1" "$base/models" 2>/dev/null || true)"
-    if [[ "$code" == 200 ]]; then ok "Ключ OpenAI верный"; return 0; fi
-    return 1
+        -H "Authorization: Bearer $2" "$1/models" 2>/dev/null || true)"
+    [[ "$code" == 200 ]]
 }
+
+check_groq_key()   { check_api_key "https://api.groq.com/openai/v1" "$1" && ok "Ключ Groq верный"; }
+check_openai_key() { check_api_key "${OPENAI_BASE_URL:-https://api.openai.com/v1}" "$1" && ok "Ключ OpenAI верный"; }
 
 # ── шаги установки ───────────────────────────────────────────────────────────────────────────
 
@@ -219,12 +220,50 @@ prepare_dirs() {
     chown -R "$APP_USER:$APP_USER" "$APP_DIR/data"
 }
 
+provider_key_name() {
+    if [[ "$1" == openai ]]; then echo OPENAI_API_KEY; else echo GROQ_API_KEY; fi
+}
+
+# Нужна ли первичная настройка: нет токена или нет ключа для выбранного режима.
+config_complete() {
+    [[ -f "$(ENV_FILE)" ]] || return 1
+    local provider
+    provider="$(env_get PROVIDER)"
+    [[ -n "$(env_get BOT_TOKEN)" && -n "$(env_get "$(provider_key_name "${provider:-free}")")" ]]
+}
+
+# Спрашивает секрет, пока проверка не пройдёт. $1 — имя в .env, $2 — подсказка, $3 — функция проверки.
+ask_key() {
+    local name="$1" prompt="$2" check="$3" reask="$4" current value
+    current="$(env_get "$name")"
+    value="${!name:-}"
+    if [[ -n "$value" ]]; then
+        "$check" "$value" || die "Ключ $name не принят."
+    elif [[ -z "$current" || "$reask" == 1 ]]; then
+        while true; do
+            if [[ -n "$current" ]]; then
+                value="$(ask_secret "$prompt (Enter — оставить $(mask "$current"))")"
+                value="${value:-$current}"
+            else
+                value="$(ask_secret "$prompt")"
+            fi
+            [[ -n "$value" ]] || { warn "Это поле обязательно."; [[ -r /dev/tty ]] || die "Не задан $name."; continue; }
+            "$check" "$value" && break
+            warn "Ключ не принят. Проверьте, что скопировали его целиком, и введите ещё раз."
+            [[ -r /dev/tty ]] || die "Неверный $name."
+        done
+    fi
+    if [[ -n "$value" ]]; then env_set "$name" "$value"; fi
+}
+
 configure() {
-    local reconfigure="${1:-0}" token key ids current
+    local reconfigure="${1:-0}" first=0 token ids current provider choice
     step "Настройка"
     if [[ ! -f "$(ENV_FILE)" ]]; then
         cp "$APP_DIR/.env.example" "$(ENV_FILE)"
     fi
+    config_complete || first=1
+    local ask_all=$(( first || reconfigure ))
 
     # Токен бота
     current="$(env_get BOT_TOKEN)"
@@ -237,7 +276,7 @@ configure() {
             else
                 token="$(ask "Токен бота от @BotFather")"
             fi
-            [[ -n "$token" ]] || { warn "Токен обязателен."; continue; }
+            [[ -n "$token" ]] || { warn "Токен обязателен."; [[ -r /dev/tty ]] || die "Не задан BOT_TOKEN."; continue; }
             check_bot_token "$token" && break
             warn "Telegram не принял этот токен. Проверьте и введите ещё раз."
             [[ -r /dev/tty ]] || die "Неверный BOT_TOKEN."
@@ -247,33 +286,40 @@ configure() {
     fi
     if [[ -n "$token" ]]; then env_set BOT_TOKEN "$token"; fi
 
-    # Ключ OpenAI
-    current="$(env_get OPENAI_API_KEY)"
-    key="${OPENAI_API_KEY:-}"
-    if [[ -z "$key" && ( -z "$current" || "$reconfigure" == 1 ) ]]; then
-        while true; do
-            if [[ -n "$current" ]]; then
-                key="$(ask_secret "Ключ OpenAI (Enter — оставить $(mask "$current"))")"
-                key="${key:-$current}"
-            else
-                key="$(ask_secret "Ключ OpenAI (https://platform.openai.com/api-keys)")"
-            fi
-            [[ -n "$key" ]] || { warn "Ключ обязателен."; continue; }
-            check_openai_key "$key" && break
-            warn "OpenAI не принял этот ключ (или на счёте нет денег). Проверьте и введите ещё раз."
-            [[ -r /dev/tty ]] || die "Неверный OPENAI_API_KEY."
-        done
-    elif [[ -n "$key" ]]; then
-        check_openai_key "$key" || die "OpenAI не принял OPENAI_API_KEY."
+    # Режим: бесплатный (Groq + голоса Microsoft) или OpenAI
+    provider="${PROVIDER:-}"
+    current="$(env_get PROVIDER)"
+    if [[ -z "$provider" ]]; then
+        if (( ask_all )); then
+            echo
+            echo "Режим работы:"
+            echo "  1) Бесплатно — Groq (распознавание и перевод) + голоса Microsoft. Лимит ~8 ч видео в сутки."
+            echo "  2) OpenAI — платно (~\$0.6 за фильм с субтитрами, ~\$2 с озвучкой), без дневных лимитов."
+            choice="$(ask "Выберите 1 или 2" "$([[ "$current" == openai ]] && echo 2 || echo 1)")"
+            if [[ "$choice" == 2 ]]; then provider=openai; else provider=free; fi
+        else
+            provider="${current:-free}"
+        fi
     fi
-    if [[ -n "$key" ]]; then env_set OPENAI_API_KEY "$key"; fi
+    [[ "$provider" == free || "$provider" == openai ]] || die "PROVIDER должен быть free или openai."
+    env_set PROVIDER "$provider"
+
+    if [[ "$provider" == free ]]; then
+        if (( ask_all )) && [[ -z "${GROQ_API_KEY:-}" && -z "$(env_get GROQ_API_KEY)" ]]; then
+            echo "Бесплатный ключ Groq: https://console.groq.com/keys → Create API Key (начинается с gsk_)."
+        fi
+        ask_key GROQ_API_KEY "Ключ Groq" check_groq_key "$reconfigure"
+    else
+        ask_key OPENAI_API_KEY "Ключ OpenAI (https://platform.openai.com/api-keys)" check_openai_key "$reconfigure"
+    fi
 
     # Кому разрешено пользоваться
     current="$(env_get ALLOWED_USER_IDS)"
     if [[ -n "${ALLOWED_USER_IDS+set}" ]]; then
         ids="$ALLOWED_USER_IDS"
-    elif [[ -z "$current" || "$reconfigure" == 1 ]]; then
-        echo "Перевод стоит денег, поэтому лучше разрешить бота только себе."
+    elif (( ask_all )); then
+        echo
+        echo "Лучше разрешить бота только себе, чтобы чужие не тратили ваши лимиты."
         echo "Свой Telegram id можно узнать у @userinfobot. Несколько id — через запятую."
         ids="$(ask "Telegram id, кому разрешён бот (Enter — всем)" "$current")"
     else
@@ -284,7 +330,7 @@ configure() {
     env_set ALLOWED_USER_IDS "$ids"
 
     secure_env
-    [[ -n "$(env_get BOT_TOKEN)" && -n "$(env_get OPENAI_API_KEY)" ]] || die "Не заданы BOT_TOKEN и OPENAI_API_KEY."
+    config_complete || die "Настройка не завершена: нет токена бота или ключа."
     ok "Настройки сохранены в $(ENV_FILE)"
 }
 
@@ -353,11 +399,7 @@ cmd_install() {
     fetch_code
     install_python_deps
     smoke_test || die "Бот не прошёл проверку после установки."
-    prepare_dirs
-    configure
-    install_cli
-    write_service
-    start_and_verify || die "Проверьте настройки: vtbot config"
+    finish_setup || die "Проверьте настройки: vtbot config"
     printf '\n%s✅ Готово!%s Напишите своему боту /start в Telegram.\n\n' "$C_GREEN" "$C_RESET"
     cmd_help
 }
@@ -375,6 +417,11 @@ cmd_update() {
     new="$(git -C "$APP_DIR" rev-parse "origin/$BRANCH")"
     if [[ "$old" == "$new" && $force == 0 ]]; then
         ok "Уже установлена последняя версия: $(version_string)"
+        # Установка могла прерваться на настройке — тогда доводим её до конца.
+        if config_complete && { ! has_systemd || systemctl is-active --quiet "$SERVICE"; }; then
+            return 0
+        fi
+        finish_setup || die "Бот не запустился. Проверьте настройки: vtbot config"
         return 0
     fi
     if [[ "$old" != "$new" ]]; then
@@ -388,18 +435,39 @@ cmd_update() {
         rollback "$old"
         die "Обновление отменено, бот работает на прежней версии."
     fi
-    env_merge_new_keys
-    secure_env
-    prepare_dirs
-    install_cli
-    write_service
-    if ! start_and_verify; then
+    if ! finish_setup; then
         warn "Новая версия не запустилась — возвращаю предыдущую."
         rollback "$old"
         start_and_verify || true
         die "Обновление отменено, бот работает на прежней версии."
     fi
     ok "Обновлено до версии: $(version_string)"
+}
+
+# В старых версиях .env модели OpenAI были прописаны явно. В бесплатном режиме Groq их не знает,
+# поэтому такие значения по умолчанию очищаются — бот сам возьмёт модели выбранного режима.
+clear_openai_defaults() {
+    [[ "$(env_get PROVIDER)" == free ]] || return 0
+    local pair key value
+    for pair in TRANSCRIBE_MODEL=whisper-1 TRANSLATE_MODEL=gpt-5.4 TTS_MODEL=gpt-4o-mini-tts; do
+        key="${pair%%=*}" value="${pair#*=}"
+        if [[ "$(env_get "$key")" == "$value" ]]; then env_set "$key" ""; fi
+    done
+}
+
+# Общий хвост установки и обновления. Настройки спрашиваются, только если чего-то не хватает.
+finish_setup() {
+    # Старые установки работали только через OpenAI — не переключаем их в бесплатный режим.
+    if [[ -f "$(ENV_FILE)" && -z "$(env_get PROVIDER)" && -n "$(env_get OPENAI_API_KEY)" ]]; then
+        env_set PROVIDER openai
+    fi
+    env_merge_new_keys
+    configure
+    clear_openai_defaults
+    prepare_dirs
+    install_cli
+    write_service
+    start_and_verify
 }
 
 rollback() {
@@ -492,7 +560,7 @@ cmd_help() {
   vtbot restart     перезапустить
   vtbot stop        остановить
   vtbot start       запустить
-  vtbot config      изменить токен, ключ OpenAI, список пользователей
+  vtbot config      изменить токен, режим (бесплатно/OpenAI), ключ, список пользователей
   vtbot bigfiles    включить файлы до 2 ГБ
   vtbot uninstall   удалить бота
 EOF

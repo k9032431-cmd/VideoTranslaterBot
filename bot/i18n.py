@@ -83,6 +83,11 @@ TEXTS: dict[str, dict[str, str]] = {
         "same_language": "⚠️ Речь в видео уже на языке {target}. Выберите другой язык перевода.",
         "error": "❌ Не получилось перевести видео: {error}\n\nПопробуйте ещё раз чуть позже.",
         "error_generic": "внутренняя ошибка",
+        "rate_limited": (
+            "⏳ Закончился лимит API: дневной лимит бесплатного тарифа или баланс OpenAI.\n\n"
+            "Попробуйте позже — бесплатный лимит обновляется каждый день."
+        ),
+        "bad_api_key": "ключ API не подходит — владельцу бота нужно выполнить vtbot config",
     },
     "en": {
         "choose_ui_language": "🌐 Choose the bot language:",
@@ -159,6 +164,11 @@ TEXTS: dict[str, dict[str, str]] = {
         "same_language": "⚠️ The video is already in {target}. Choose a different target language.",
         "error": "❌ Couldn't translate the video: {error}\n\nPlease try again a bit later.",
         "error_generic": "internal error",
+        "rate_limited": (
+            "⏳ The API limit is used up: the free tier's daily limit or the OpenAI balance.\n\n"
+            "Please try again later — the free limit resets every day."
+        ),
+        "bad_api_key": "the API key was rejected — the bot owner needs to run vtbot config",
     },
     "uk": {
         "choose_ui_language": "🌐 Оберіть мову бота:",
@@ -235,6 +245,11 @@ TEXTS: dict[str, dict[str, str]] = {
         "same_language": "⚠️ Мовлення у відео вже мовою {target}. Оберіть іншу мову перекладу.",
         "error": "❌ Не вдалося перекласти відео: {error}\n\nСпробуйте ще раз трохи пізніше.",
         "error_generic": "внутрішня помилка",
+        "rate_limited": (
+            "⏳ Закінчився ліміт API: денний ліміт безкоштовного тарифу або баланс OpenAI.\n\n"
+            "Спробуйте пізніше — безкоштовний ліміт оновлюється щодня."
+        ),
+        "bad_api_key": "ключ API не підходить — власнику бота потрібно виконати vtbot config",
     },
 }
 

@@ -45,8 +45,10 @@ async def main() -> None:
 
     storage = UserStorage(config.db_path)
     await storage.open()
+    # Groq's free tier answers 429 often (per-minute limits); the client waits and retries.
     client = AsyncOpenAI(
-        api_key=config.openai_api_key, base_url=config.openai_base_url, max_retries=5, timeout=600
+        api_key=config.ai_api_key, base_url=config.ai_base_url,
+        max_retries=10 if config.provider == "free" else 5, timeout=600,
     )
     jobs = JobManager(bot, config, client)
 

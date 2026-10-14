@@ -6,6 +6,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+import edge_tts
 from openai import AsyncOpenAI
 
 from ..languages import Language
@@ -13,6 +14,7 @@ from . import media
 from .models import Segment
 
 TTS_CONCURRENCY = 4
+TTS_ATTEMPTS = 3
 # Faster than this sounds unnatural; past it we let the line run slightly late instead.
 MAX_TEMPO = 1.35
 TAIL_SECONDS = 1.0
@@ -53,10 +55,29 @@ def _silence(seconds: float) -> bytes:
     return b"\x00" * (int(round(seconds * media.AUDIO_RATE)) * BYTES_PER_SAMPLE)
 
 
+async def _openai_tts(client: AsyncOpenAI, model: str, voice: str, text: str, target: Language, out: Path) -> None:
+    kwargs: dict = {"model": model, "voice": voice, "input": text, "response_format": "mp3"}
+    if not model.startswith("tts-1"):
+        kwargs["instructions"] = (
+            f"Speak {target.english} naturally and clearly, like a professional film voice-over "
+            "artist. Match a conversational pace; do not over-act."
+        )
+    response = await client.audio.speech.create(**kwargs)
+    out.write_bytes(response.content)
+
+
+async def _edge_tts(voice: str, text: str, out: Path) -> None:
+    await edge_tts.Communicate(text, voice).save(str(out))
+    if not out.exists() or out.stat().st_size == 0:
+        raise RuntimeError("Edge TTS returned no audio")
+
+
 async def synthesize(
     client: AsyncOpenAI,
+    engine: str,  # edge | openai
     model: str,
-    voice: str,
+    voice: str,  # OpenAI voice
+    gender: str,  # male | female, for Edge voices
     segments: list[Segment],
     target: Language,
     work_dir: Path,
@@ -66,6 +87,7 @@ async def synthesize(
     """Return a WAV track as long as the video with the voice-over in place."""
     tts_dir = work_dir / "tts"
     tts_dir.mkdir(exist_ok=True)
+    edge_voice = target.edge_female if gender == "female" else target.edge_male
     semaphore = asyncio.Semaphore(TTS_CONCURRENCY)
     done = 0
     lock = asyncio.Lock()
@@ -73,15 +95,19 @@ async def synthesize(
     async def one(index: int, seg: Segment) -> Path:
         nonlocal done
         raw = tts_dir / f"{index:05d}.mp3"
-        kwargs: dict = {"model": model, "voice": voice, "input": seg.translation, "response_format": "mp3"}
-        if not model.startswith("tts-1"):
-            kwargs["instructions"] = (
-                f"Speak {target.english} naturally and clearly, like a professional film voice-over "
-                "artist. Match a conversational pace; do not over-act."
-            )
         async with semaphore:
-            response = await client.audio.speech.create(**kwargs)
-            raw.write_bytes(response.content)
+            for attempt in range(1, TTS_ATTEMPTS + 1):
+                try:
+                    if engine == "edge":
+                        await _edge_tts(edge_voice, seg.translation, raw)
+                    else:
+                        await _openai_tts(client, model, voice, seg.translation, target, raw)
+                    break
+                except Exception:
+                    # The OpenAI client retries on its own; Edge occasionally drops a connection.
+                    if engine != "edge" or attempt == TTS_ATTEMPTS:
+                        raise
+                    await asyncio.sleep(2 * attempt)
         async with lock:
             done += 1
             await on_progress(done / len(segments) * 0.9)

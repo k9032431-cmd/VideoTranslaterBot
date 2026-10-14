@@ -12,7 +12,7 @@ from pathlib import Path
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import FSInputFile
-from openai import APIError, AsyncOpenAI
+from openai import APIError, AsyncOpenAI, AuthenticationError, RateLimitError
 
 from . import keyboards, languages
 from .config import Config
@@ -124,6 +124,12 @@ class JobManager:
             await status.final(t(lang, "no_speech"))
         except SameLanguageError:
             await status.final(t(lang, "same_language", target=target.label))
+        except RateLimitError:
+            log.warning("API limit reached for user %s", req.user_id)
+            await status.final(t(lang, "rate_limited"))
+        except AuthenticationError:
+            log.error("API key was rejected")
+            await status.final(t(lang, "error", error=t(lang, "bad_api_key")))
         except TooLongError as exc:
             await status.final(t(lang, "too_long", minutes=exc.minutes, max_min=self.config.max_video_minutes))
         except Exception as exc:

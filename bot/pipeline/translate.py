@@ -52,6 +52,7 @@ async def _translate_batch(
     batch: list[tuple[int, Segment]],
     context: list[Segment],
     for_voice: bool,
+    reasoning_effort: str = "",
 ) -> dict[int, str]:
     lines = []
     for idx, seg in batch:
@@ -65,6 +66,7 @@ async def _translate_batch(
     }
     expected = {idx for idx, _ in batch}
 
+    extra: dict = {"reasoning_effort": reasoning_effort} if reasoning_effort else {}
     last_error = ""
     for attempt in range(1, ATTEMPTS + 1):
         response = await client.chat.completions.create(
@@ -74,6 +76,7 @@ async def _translate_batch(
                 {"role": "system", "content": system},
                 {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
             ],
+            **extra,
         )
         content = response.choices[0].message.content or ""
         try:
@@ -92,11 +95,12 @@ async def _translate_batch(
     if len(batch) > 1:
         # Smaller batches are much easier for the model to get exactly right.
         half = len(batch) // 2
-        first = await _translate_batch(client, model, system, batch[:half], context, for_voice)
+        first = await _translate_batch(client, model, system, batch[:half], context, for_voice, reasoning_effort)
         for idx, seg in batch[:half]:
             seg.translation = first[idx]
         second = await _translate_batch(
-            client, model, system, batch[half:], (context + [s for _, s in batch[:half]])[-CONTEXT_LINES:], for_voice
+            client, model, system, batch[half:], (context + [s for _, s in batch[:half]])[-CONTEXT_LINES:],
+            for_voice, reasoning_effort,
         )
         return first | second
     raise TranslationError(last_error)
@@ -110,6 +114,7 @@ async def translate(
     target: Language,
     for_voice: bool,
     on_progress: Callable[[float], Awaitable[None]],
+    reasoning_effort: str = "",
 ) -> None:
     """Fill `translation` on every segment, in place."""
     system = _system_prompt(source, target, for_voice)
@@ -117,7 +122,7 @@ async def translate(
     for offset in range(0, len(indexed), BATCH_SIZE):
         batch = indexed[offset:offset + BATCH_SIZE]
         context = segments[max(0, offset - CONTEXT_LINES):offset]
-        result = await _translate_batch(client, model, system, batch, context, for_voice)
+        result = await _translate_batch(client, model, system, batch, context, for_voice, reasoning_effort)
         for idx, seg in batch:
             seg.translation = result[idx]
         await on_progress(min(offset + BATCH_SIZE, len(indexed)) / len(indexed))

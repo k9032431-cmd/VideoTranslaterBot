@@ -81,6 +81,7 @@ async def run_job(client: AsyncOpenAI, config: Config, params: JobParams, report
     await report("stage_translate", 0.0)
     await translate.translate(
         client, config.translate_model, segments, source, target, for_voice=voice,
+        reasoning_effort=config.translate_reasoning_effort,
         on_progress=lambda p: report("stage_translate", p),
     )
 
@@ -91,7 +92,8 @@ async def run_job(client: AsyncOpenAI, config: Config, params: JobParams, report
     if voice:
         await report("stage_tts", 0.0)
         dub_track = await dubbing.synthesize(
-            client, config.tts_model, config.tts_voice, segments, target, work, total,
+            client, config.tts_engine, config.tts_model, config.tts_voice, config.tts_gender,
+            segments, target, work, total,
             on_progress=lambda p: report("stage_tts", p),
         )
 

@@ -163,3 +163,44 @@ async def test_translate_splits_batch_after_repeated_failures():
     assert [s.translation for s in segs] == ["L0", "L1", "L2", "L3"]
     # voice mode sends a length budget
     assert "max_chars" in completions.calls[0]["messages"][1]["content"]
+
+
+def test_config_free_defaults(monkeypatch, tmp_path):
+    from bot import config as cfg
+    for key in ("PROVIDER", "TRANSCRIBE_MODEL", "TRANSLATE_MODEL", "TTS_ENGINE", "OPENAI_BASE_URL",
+                "TRANSLATE_REASONING_EFFORT", "OPENAI_API_KEY", "TTS_GENDER"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("BOT_TOKEN", "1:x")
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    with pytest.raises(SystemExit, match="GROQ_API_KEY"):
+        cfg.load_config()
+    monkeypatch.setenv("GROQ_API_KEY", "gsk_x")
+    c = cfg.load_config()
+    assert (c.provider, c.ai_api_key, c.ai_base_url) == ("free", "gsk_x", cfg.GROQ_BASE_URL)
+    assert (c.transcribe_model, c.tts_engine, c.tts_gender) == ("whisper-large-v3", "edge", "male")
+    assert c.translate_reasoning_effort == "low"
+
+    monkeypatch.setenv("PROVIDER", "openai")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-x")
+    c = cfg.load_config()
+    assert (c.ai_api_key, c.ai_base_url, c.tts_engine, c.transcribe_model) == ("sk-x", None, "openai", "whisper-1")
+
+    monkeypatch.setenv("PROVIDER", "free")
+    monkeypatch.setenv("TTS_ENGINE", "openai")
+    with pytest.raises(SystemExit):
+        cfg.load_config()
+
+
+@pytest.mark.asyncio
+async def test_translate_passes_reasoning_effort():
+    segs = [Segment(0, 1, "a")]
+    completions = FakeCompletions([_echo])
+    client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+    await translate.translate(client, "m", segs, languages.get("en"), languages.get("ru"), False, _noop,
+                              reasoning_effort="low")
+    assert completions.calls[0]["reasoning_effort"] == "low"
+
+
+def test_every_language_has_edge_voices():
+    for lang in languages.LANGUAGES:
+        assert lang.edge_male.startswith(lang.code + "-") and lang.edge_female.startswith(lang.code + "-")
