@@ -229,7 +229,9 @@ config_complete() {
     [[ -f "$(ENV_FILE)" ]] || return 1
     local provider
     provider="$(env_get PROVIDER)"
-    [[ -n "$(env_get BOT_TOKEN)" && -n "$(env_get "$(provider_key_name "${provider:-free}")")" ]]
+    [[ -n "$(env_get BOT_TOKEN)" ]] || return 1
+    [[ "$provider" == local ]] && return 0
+    [[ -n "$provider" && -n "$(env_get "$(provider_key_name "$provider")")" ]]
 }
 
 # Спрашивает секрет, пока проверка не пройдёт. $1 — имя в .env, $2 — подсказка, $3 — функция проверки.
@@ -286,25 +288,35 @@ configure() {
     fi
     if [[ -n "$token" ]]; then env_set BOT_TOKEN "$token"; fi
 
-    # Режим: бесплатный (Groq + голоса Microsoft) или OpenAI
+    # Режим работы
     provider="${PROVIDER:-}"
     current="$(env_get PROVIDER)"
     if [[ -z "$provider" ]]; then
         if (( ask_all )); then
+            local default=1
+            [[ "$current" == free && -n "$(env_get GROQ_API_KEY)" ]] && default=2
+            [[ "$current" == openai ]] && default=3
             echo
             echo "Режим работы:"
-            echo "  1) Бесплатно — Groq (распознавание и перевод) + голоса Microsoft. Лимит ~8 ч видео в сутки."
-            echo "  2) OpenAI — платно (~\$0.6 за фильм с субтитрами, ~\$2 с озвучкой), без дневных лимитов."
-            choice="$(ask "Выберите 1 или 2" "$([[ "$current" == openai ]] && echo 2 || echo 1)")"
-            if [[ "$choice" == 2 ]]; then provider=openai; else provider=free; fi
+            echo "  1) На сервере — бесплатно, без регистраций и лимитов. Медленнее: фильм ~1.5–3 часа."
+            echo "  2) Groq — бесплатно, быстро, нужен ключ Groq. Лимит ~8 ч видео в сутки."
+            echo "  3) OpenAI — платно (~\$0.6 за фильм с субтитрами, ~\$2 с озвучкой), лучший перевод."
+            choice="$(ask "Выберите 1, 2 или 3" "$default")"
+            case "$choice" in
+                2) provider=free ;;
+                3) provider=openai ;;
+                *) provider=local ;;
+            esac
         else
-            provider="${current:-free}"
+            provider="${current:-local}"
         fi
     fi
-    [[ "$provider" == free || "$provider" == openai ]] || die "PROVIDER должен быть free или openai."
+    [[ "$provider" =~ ^(local|free|openai)$ ]] || die "PROVIDER должен быть local, free или openai."
     env_set PROVIDER "$provider"
 
-    if [[ "$provider" == free ]]; then
+    if [[ "$provider" == local ]]; then
+        configure_local_models "$ask_all"
+    elif [[ "$provider" == free ]]; then
         if (( ask_all )) && [[ -z "${GROQ_API_KEY:-}" && -z "$(env_get GROQ_API_KEY)" ]]; then
             echo "Бесплатный ключ Groq: https://console.groq.com/keys → Create API Key (начинается с gsk_)."
         fi
@@ -349,6 +361,8 @@ Group=$APP_USER
 WorkingDirectory=$APP_DIR
 Environment=DATA_DIR=$APP_DIR/data
 Environment=PYTHONUNBUFFERED=1
+Environment=HOME=$APP_DIR/data
+Environment=HF_HUB_DISABLE_TELEMETRY=1
 ExecStart=$APP_DIR/venv/bin/python -m bot
 Restart=always
 RestartSec=5
@@ -444,6 +458,72 @@ cmd_update() {
     ok "Обновлено до версии: $(version_string)"
 }
 
+LOCAL_WHISPER_MODELS="tiny base small medium large-v2 large-v3 large-v3-turbo turbo distil-large-v3"
+NLLB_SMALL="JustFrederik/nllb-200-distilled-600M-ct2-int8"
+NLLB_LARGE="OpenNMT/nllb-200-distilled-1.3B-ct2-int8"
+
+mem_total_mb() { awk '/^MemTotal:/ { print int($2 / 1024) }' /proc/meminfo; }
+
+# Подбирает модели под память сервера: распознавание речи и перевод работают прямо на нём.
+configure_local_models() {
+    local force="$1" whisper nllb mem cores
+    whisper="$(env_get TRANSCRIBE_MODEL)"
+    nllb="$(env_get TRANSLATE_MODEL)"
+    if [[ "$force" != 1 && " $LOCAL_WHISPER_MODELS " == *" $whisper "* && "$nllb" == *nllb* ]]; then
+        return 0
+    fi
+    mem="$(mem_total_mb)"
+    cores="$(nproc)"
+    if (( mem >= 7000 )); then
+        whisper=large-v3-turbo nllb="$NLLB_LARGE"
+    elif (( mem >= 3500 )); then
+        whisper=large-v3-turbo nllb="$NLLB_SMALL"
+    else
+        whisper=small nllb="$NLLB_SMALL"
+    fi
+    env_set TRANSCRIBE_MODEL "$whisper"
+    env_set TRANSLATE_MODEL "$nllb"
+    env_set MAX_CONCURRENT_JOBS 1  # всё считает процессор — по одному видео за раз
+    ok "Сервер: ${mem} МБ памяти, ${cores} ядер → распознавание: $whisper, перевод: ${nllb#*/}"
+    if (( cores < 2 )); then
+        warn "Одно ядро — перевод будет очень медленным. Лучше сервер хотя бы с 2 ядрами."
+    fi
+}
+
+ensure_swap() {
+    # На маленьких серверах модели могут не поместиться в память — добавляем файл подкачки.
+    (( $(mem_total_mb) < 3500 )) || return 0
+    [[ -n "$(swapon --show --noheadings 2>/dev/null)" ]] && return 0
+    [[ -e /swapfile ]] && return 0
+    step "Мало памяти — создаю файл подкачки 2 ГБ…"
+    if { fallocate -l 2G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none; } \
+        && chmod 600 /swapfile && mkswap /swapfile >/dev/null && swapon /swapfile; then
+        grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' >>/etc/fstab
+        ok "Файл подкачки включён"
+    else
+        rm -f /swapfile
+        warn "Не удалось создать файл подкачки."
+    fi
+}
+
+# Скачивает модели и проверяет, что они загружаются (только для режима «на сервере»).
+prefetch_models() {
+    [[ "$(env_get PROVIDER)" == local ]] || return 0
+    local free_mb
+    free_mb="$(df --output=avail -m "$APP_DIR" | tail -1 | tr -d ' ')"
+    if (( free_mb < 4000 )); then
+        warn "На диске свободно ${free_mb} МБ, а моделям нужно до 4 ГБ."
+    fi
+    ensure_swap
+    step "Скачиваю и проверяю модели (первый раз 1–3 ГБ, это может занять несколько минут)…"
+    if ! (cd "$APP_DIR" && runuser -u "$APP_USER" -- env HOME="$APP_DIR/data" DATA_DIR="$APP_DIR/data" \
+            HF_HUB_DISABLE_TELEMETRY=1 "$APP_DIR/venv/bin/python" -m bot.prefetch); then
+        warn "Не удалось скачать или запустить модели."
+        return 1
+    fi
+    ok "Модели готовы"
+}
+
 # В старых версиях .env модели OpenAI были прописаны явно. В бесплатном режиме Groq их не знает,
 # поэтому такие значения по умолчанию очищаются — бот сам возьмёт модели выбранного режима.
 clear_openai_defaults() {
@@ -461,10 +541,12 @@ finish_setup() {
     if [[ -f "$(ENV_FILE)" && -z "$(env_get PROVIDER)" && -n "$(env_get OPENAI_API_KEY)" ]]; then
         env_set PROVIDER openai
     fi
+    create_user
     env_merge_new_keys
     configure
     clear_openai_defaults
     prepare_dirs
+    prefetch_models || return 1
     install_cli
     write_service
     start_and_verify
@@ -560,7 +642,7 @@ cmd_help() {
   vtbot restart     перезапустить
   vtbot stop        остановить
   vtbot start       запустить
-  vtbot config      изменить токен, режим (бесплатно/OpenAI), ключ, список пользователей
+  vtbot config      изменить токен, режим работы, ключ, список пользователей
   vtbot bigfiles    включить файлы до 2 ГБ
   vtbot uninstall   удалить бота
 EOF

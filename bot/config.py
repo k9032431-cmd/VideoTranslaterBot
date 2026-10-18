@@ -13,6 +13,8 @@ PROVIDER_DEFAULTS = {
     # Free: Groq (Whisper large-v3 + GPT-OSS) and Microsoft Edge voices.
     "free": (GROQ_BASE_URL, "whisper-large-v3", "openai/gpt-oss-120b", "low", "edge"),
     "openai": (None, "whisper-1", "gpt-5.4", "", "openai"),
+    # Local: everything runs on the server (faster-whisper + NLLB-200), voices from Microsoft Edge.
+    "local": (None, "small", "JustFrederik/nllb-200-distilled-600M-ct2-int8", "", "edge"),
 }
 
 
@@ -38,7 +40,7 @@ def _ids(name: str) -> frozenset[int]:
 @dataclass(frozen=True)
 class Config:
     bot_token: str
-    provider: str  # free | openai
+    provider: str  # local | free | openai
     ai_api_key: str
     ai_base_url: str | None
 
@@ -68,6 +70,10 @@ class Config:
         object.__setattr__(self, "db_path", self.data_dir / "bot.sqlite3")
 
     @property
+    def models_dir(self) -> Path:
+        return self.data_dir / "models"
+
+    @property
     def max_download_bytes(self) -> int:
         return (2000 if self.telegram_api_url else 20) * 1024 * 1024
 
@@ -81,15 +87,17 @@ def load_config() -> Config:
     if not token:
         raise SystemExit("BOT_TOKEN is not set (see .env.example)")
 
-    provider = _str("PROVIDER", "free").lower()
+    provider = _str("PROVIDER", "local").lower()
     if provider not in PROVIDER_DEFAULTS:
         raise SystemExit(f"PROVIDER must be one of: {', '.join(PROVIDER_DEFAULTS)}")
     base_url, transcribe_model, translate_model, effort, tts_engine = PROVIDER_DEFAULTS[provider]
 
-    key_name = "GROQ_API_KEY" if provider == "free" else "OPENAI_API_KEY"
-    api_key = os.getenv(key_name, "").strip()
-    if not api_key:
-        raise SystemExit(f"{key_name} is not set (see .env.example)")
+    api_key = ""
+    if provider != "local":
+        key_name = "GROQ_API_KEY" if provider == "free" else "OPENAI_API_KEY"
+        api_key = os.getenv(key_name, "").strip()
+        if not api_key:
+            raise SystemExit(f"{key_name} is not set (see .env.example)")
 
     tts_engine = _str("TTS_ENGINE", tts_engine).lower()
     if tts_engine not in ("edge", "openai"):

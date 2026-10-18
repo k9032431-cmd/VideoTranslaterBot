@@ -46,10 +46,12 @@ async def main() -> None:
     storage = UserStorage(config.db_path)
     await storage.open()
     # Groq's free tier answers 429 often (per-minute limits); the client waits and retries.
-    client = AsyncOpenAI(
-        api_key=config.ai_api_key, base_url=config.ai_base_url,
-        max_retries=10 if config.provider == "free" else 5, timeout=600,
-    )
+    client = None
+    if config.provider != "local":
+        client = AsyncOpenAI(
+            api_key=config.ai_api_key, base_url=config.ai_base_url,
+            max_retries=10 if config.provider == "free" else 5, timeout=600,
+        )
     jobs = JobManager(bot, config, client)
 
     dp = Dispatcher(storage=MemoryStorage(), config=config, user_storage=storage, jobs=jobs)
@@ -69,7 +71,8 @@ async def main() -> None:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
         await storage.close()
-        await client.close()
+        if client:
+            await client.close()
         await bot.session.close()
 
 

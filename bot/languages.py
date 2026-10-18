@@ -15,6 +15,7 @@ class Language:
     english: str  # used in prompts to the translation model
     edge_male: str = ""  # Microsoft Edge neural voices (free TTS)
     edge_female: str = ""
+    nllb: str = ""  # language code of the local NLLB-200 translation model
 
     @property
     def label(self) -> str:
@@ -22,22 +23,22 @@ class Language:
 
 
 LANGUAGES: tuple[Language, ...] = (
-    Language("ru", "🇷🇺", "Русский", "Russian", "ru-RU-DmitryNeural", "ru-RU-SvetlanaNeural"),
-    Language("en", "🇬🇧", "English", "English", "en-US-AndrewMultilingualNeural", "en-US-EmmaMultilingualNeural"),
-    Language("uk", "🇺🇦", "Українська", "Ukrainian", "uk-UA-OstapNeural", "uk-UA-PolinaNeural"),
-    Language("de", "🇩🇪", "Deutsch", "German", "de-DE-ConradNeural", "de-DE-KatjaNeural"),
-    Language("fr", "🇫🇷", "Français", "French", "fr-FR-HenriNeural", "fr-FR-DeniseNeural"),
-    Language("es", "🇪🇸", "Español", "Spanish", "es-ES-AlvaroNeural", "es-ES-ElviraNeural"),
-    Language("it", "🇮🇹", "Italiano", "Italian", "it-IT-DiegoNeural", "it-IT-ElsaNeural"),
-    Language("pt", "🇵🇹", "Português", "Portuguese", "pt-PT-DuarteNeural", "pt-PT-RaquelNeural"),
-    Language("pl", "🇵🇱", "Polski", "Polish", "pl-PL-MarekNeural", "pl-PL-ZofiaNeural"),
-    Language("tr", "🇹🇷", "Türkçe", "Turkish", "tr-TR-AhmetNeural", "tr-TR-EmelNeural"),
-    Language("kk", "🇰🇿", "Қазақша", "Kazakh", "kk-KZ-DauletNeural", "kk-KZ-AigulNeural"),
-    Language("uz", "🇺🇿", "Oʻzbekcha", "Uzbek", "uz-UZ-SardorNeural", "uz-UZ-MadinaNeural"),
-    Language("ar", "🇸🇦", "العربية", "Arabic", "ar-SA-HamedNeural", "ar-SA-ZariyahNeural"),
-    Language("zh", "🇨🇳", "中文", "Chinese (Simplified)", "zh-CN-YunxiNeural", "zh-CN-XiaoxiaoNeural"),
-    Language("ja", "🇯🇵", "日本語", "Japanese", "ja-JP-KeitaNeural", "ja-JP-NanamiNeural"),
-    Language("ko", "🇰🇷", "한국어", "Korean", "ko-KR-InJoonNeural", "ko-KR-SunHiNeural"),
+    Language("ru", "🇷🇺", "Русский", "Russian", "ru-RU-DmitryNeural", "ru-RU-SvetlanaNeural", "rus_Cyrl"),
+    Language("en", "🇬🇧", "English", "English", "en-US-AndrewMultilingualNeural", "en-US-EmmaMultilingualNeural", "eng_Latn"),
+    Language("uk", "🇺🇦", "Українська", "Ukrainian", "uk-UA-OstapNeural", "uk-UA-PolinaNeural", "ukr_Cyrl"),
+    Language("de", "🇩🇪", "Deutsch", "German", "de-DE-ConradNeural", "de-DE-KatjaNeural", "deu_Latn"),
+    Language("fr", "🇫🇷", "Français", "French", "fr-FR-HenriNeural", "fr-FR-DeniseNeural", "fra_Latn"),
+    Language("es", "🇪🇸", "Español", "Spanish", "es-ES-AlvaroNeural", "es-ES-ElviraNeural", "spa_Latn"),
+    Language("it", "🇮🇹", "Italiano", "Italian", "it-IT-DiegoNeural", "it-IT-ElsaNeural", "ita_Latn"),
+    Language("pt", "🇵🇹", "Português", "Portuguese", "pt-PT-DuarteNeural", "pt-PT-RaquelNeural", "por_Latn"),
+    Language("pl", "🇵🇱", "Polski", "Polish", "pl-PL-MarekNeural", "pl-PL-ZofiaNeural", "pol_Latn"),
+    Language("tr", "🇹🇷", "Türkçe", "Turkish", "tr-TR-AhmetNeural", "tr-TR-EmelNeural", "tur_Latn"),
+    Language("kk", "🇰🇿", "Қазақша", "Kazakh", "kk-KZ-DauletNeural", "kk-KZ-AigulNeural", "kaz_Cyrl"),
+    Language("uz", "🇺🇿", "Oʻzbekcha", "Uzbek", "uz-UZ-SardorNeural", "uz-UZ-MadinaNeural", "uzn_Latn"),
+    Language("ar", "🇸🇦", "العربية", "Arabic", "ar-SA-HamedNeural", "ar-SA-ZariyahNeural", "arb_Arab"),
+    Language("zh", "🇨🇳", "中文", "Chinese (Simplified)", "zh-CN-YunxiNeural", "zh-CN-XiaoxiaoNeural", "zho_Hans"),
+    Language("ja", "🇯🇵", "日本語", "Japanese", "ja-JP-KeitaNeural", "ja-JP-NanamiNeural", "jpn_Jpan"),
+    Language("ko", "🇰🇷", "한국어", "Korean", "ko-KR-InJoonNeural", "ko-KR-SunHiNeural", "kor_Hang"),
 )
 
 BY_CODE: dict[str, Language] = {lang.code: lang for lang in LANGUAGES}

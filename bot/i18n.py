@@ -88,6 +88,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "Попробуйте позже — бесплатный лимит обновляется каждый день."
         ),
         "bad_api_key": "ключ API не подходит — владельцу бота нужно выполнить vtbot config",
+        "unsupported_language": "⚠️ Не удалось определить язык видео. Выберите его вручную из списка.",
     },
     "en": {
         "choose_ui_language": "🌐 Choose the bot language:",
@@ -169,6 +170,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "Please try again later — the free limit resets every day."
         ),
         "bad_api_key": "the API key was rejected — the bot owner needs to run vtbot config",
+        "unsupported_language": "⚠️ Couldn't recognize the video's language. Please pick it from the list.",
     },
     "uk": {
         "choose_ui_language": "🌐 Оберіть мову бота:",
@@ -250,6 +252,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "Спробуйте пізніше — безкоштовний ліміт оновлюється щодня."
         ),
         "bad_api_key": "ключ API не підходить — власнику бота потрібно виконати vtbot config",
+        "unsupported_language": "⚠️ Не вдалося визначити мову відео. Оберіть її вручну зі списку.",
     },
 }
 

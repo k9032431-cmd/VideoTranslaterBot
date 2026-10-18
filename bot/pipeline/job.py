@@ -10,7 +10,7 @@ from openai import AsyncOpenAI
 from .. import languages
 from ..config import Config
 from ..languages import Language
-from . import dubbing, media, render, subtitles, transcribe, translate
+from . import dubbing, local, media, render, subtitles, transcribe, translate
 
 log = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ def _language(code: str | None) -> Language:
     return Language(code=name, flag="🏳️", native=name.capitalize(), english=name.capitalize())
 
 
-async def run_job(client: AsyncOpenAI, config: Config, params: JobParams, report: Reporter) -> JobResult:
+async def run_job(client: AsyncOpenAI | None, config: Config, params: JobParams, report: Reporter) -> JobResult:
     work = params.work_dir
     target = languages.get(params.target)
     voice = params.mode in ("voice", "both")
@@ -65,11 +65,17 @@ async def run_job(client: AsyncOpenAI, config: Config, params: JobParams, report
     await media.extract_speech_audio(params.video, speech)
 
     await report("stage_transcribe", 0.0)
-    segments, detected = await transcribe.transcribe(
-        client, config.transcribe_model, speech, work,
-        language=None if params.source == "auto" else params.source,
-        on_progress=lambda p: report("stage_transcribe", p),
-    )
+    language = None if params.source == "auto" else params.source
+    if config.provider == "local":
+        segments, detected = await local.transcribe(
+            speech, language, config.transcribe_model, config.models_dir,
+            on_progress=lambda p: report("stage_transcribe", p),
+        )
+    else:
+        segments, detected = await transcribe.transcribe(
+            client, config.transcribe_model, speech, work, language,
+            on_progress=lambda p: report("stage_transcribe", p),
+        )
     speech.unlink(missing_ok=True)
     if not segments:
         raise NoSpeechError
@@ -79,11 +85,17 @@ async def run_job(client: AsyncOpenAI, config: Config, params: JobParams, report
     log.info("Transcribed %d segments (%s)", len(segments), source.code)
 
     await report("stage_translate", 0.0)
-    await translate.translate(
-        client, config.translate_model, segments, source, target, for_voice=voice,
-        reasoning_effort=config.translate_reasoning_effort,
-        on_progress=lambda p: report("stage_translate", p),
-    )
+    if config.provider == "local":
+        await local.translate(
+            segments, source, target, config.translate_model, config.models_dir,
+            on_progress=lambda p: report("stage_translate", p),
+        )
+    else:
+        await translate.translate(
+            client, config.translate_model, segments, source, target, for_voice=voice,
+            reasoning_effort=config.translate_reasoning_effort,
+            on_progress=lambda p: report("stage_translate", p),
+        )
 
     srt = work / f"subtitles_{target.code}.srt"
     srt.write_text(subtitles.to_srt(subtitles.build_cues(segments, target.code)), encoding="utf-8")

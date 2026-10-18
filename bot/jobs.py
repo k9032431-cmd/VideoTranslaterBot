@@ -19,6 +19,7 @@ from .config import Config
 from .i18n import t
 from .pipeline import media
 from .pipeline.job import JobParams, NoSpeechError, SameLanguageError, run_job
+from .pipeline.local import UnsupportedLanguageError
 
 log = logging.getLogger(__name__)
 
@@ -80,7 +81,7 @@ class StatusMessage:
 
 
 class JobManager:
-    def __init__(self, bot: Bot, config: Config, client: AsyncOpenAI) -> None:
+    def __init__(self, bot: Bot, config: Config, client: AsyncOpenAI | None) -> None:
         self.bot = bot
         self.config = config
         self.client = client
@@ -130,6 +131,8 @@ class JobManager:
         except AuthenticationError:
             log.error("API key was rejected")
             await status.final(t(lang, "error", error=t(lang, "bad_api_key")))
+        except UnsupportedLanguageError:
+            await status.final(t(lang, "unsupported_language"))
         except TooLongError as exc:
             await status.final(t(lang, "too_long", minutes=exc.minutes, max_min=self.config.max_video_minutes))
         except Exception as exc:

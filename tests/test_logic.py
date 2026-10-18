@@ -1,4 +1,5 @@
 import json
+import re
 from types import SimpleNamespace
 
 import pytest
@@ -172,6 +173,11 @@ def test_config_free_defaults(monkeypatch, tmp_path):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("BOT_TOKEN", "1:x")
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    c = cfg.load_config()  # local mode is the default and needs no key
+    assert (c.provider, c.ai_api_key, c.tts_engine, c.transcribe_model) == ("local", "", "edge", "small")
+    assert "nllb" in c.translate_model and c.models_dir == tmp_path / "models"
+
+    monkeypatch.setenv("PROVIDER", "free")
     with pytest.raises(SystemExit, match="GROQ_API_KEY"):
         cfg.load_config()
     monkeypatch.setenv("GROQ_API_KEY", "gsk_x")
@@ -204,3 +210,8 @@ async def test_translate_passes_reasoning_effort():
 def test_every_language_has_edge_voices():
     for lang in languages.LANGUAGES:
         assert lang.edge_male.startswith(lang.code + "-") and lang.edge_female.startswith(lang.code + "-")
+
+
+def test_every_language_has_nllb_code():
+    for lang in languages.LANGUAGES:
+        assert re.fullmatch(r"[a-z]{3}_[A-Z][a-z]{3}", lang.nllb), lang.code
