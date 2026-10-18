@@ -40,8 +40,10 @@ die()  { printf '%s✘ %s%s\n' "$C_RED" "$*" "$C_RESET" >&2; exit 1; }
 ask() {
     local prompt="$1" default="${2:-}" answer=""
     if [[ -n "$default" ]]; then prompt="$prompt [$default]"; fi
+    # Вопрос печатаем прямо в терминал: `read -p` пишет его в stderr, а stderr здесь заглушён
+    # (иначе без терминала сыплются ошибки /dev/tty).
     if [[ -r /dev/tty ]]; then
-        { read -r -p "$prompt: " answer </dev/tty; } 2>/dev/null || true
+        { printf '%s: ' "$prompt" >/dev/tty && read -r answer </dev/tty; } 2>/dev/null || true
     fi
     printf '%s' "${answer:-$default}"
 }
@@ -49,7 +51,7 @@ ask() {
 ask_secret() {
     local prompt="$1" answer=""
     if [[ -r /dev/tty ]]; then
-        { read -r -s -p "$prompt: " answer </dev/tty && echo >/dev/tty; } 2>/dev/null || true
+        { printf '%s: ' "$prompt" >/dev/tty && read -r -s answer </dev/tty && echo >/dev/tty; } 2>/dev/null || true
     fi
     printf '%s' "$answer"
 }
