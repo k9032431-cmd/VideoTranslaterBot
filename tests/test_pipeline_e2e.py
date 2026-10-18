@@ -72,7 +72,7 @@ def _config(tmp: Path, tts_engine: str = "openai") -> Config:
         telegram_api_url=None, telegram_api_local=True,
         transcribe_model="whisper-1", translate_model="m", translate_reasoning_effort="",
         tts_engine=tts_engine, tts_model="gpt-4o-mini-tts", tts_voice="onyx", tts_gender="female",
-        allowed_user_ids=frozenset(), max_video_minutes=180, max_concurrent_jobs=1,
+        allowed_user_ids=frozenset(), admin_user_ids=frozenset(), max_video_minutes=180, max_concurrent_jobs=1,
         original_volume=0.25, data_dir=tmp,
     )
 

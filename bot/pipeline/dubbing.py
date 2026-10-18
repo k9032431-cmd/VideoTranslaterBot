@@ -66,6 +66,14 @@ async def _openai_tts(client: AsyncOpenAI, model: str, voice: str, text: str, ta
     out.write_bytes(response.content)
 
 
+# Turkmen letters a Turkish voice can't pronounce → their closest Turkish sounds.
+_TURKMEN_TO_TURKISH = str.maketrans({"ä": "e", "Ä": "E", "ň": "n", "Ň": "N", "ý": "y", "Ý": "Y", "ž": "j", "Ž": "J"})
+
+
+def speakable(text: str, lang: Language) -> str:
+    return text.translate(_TURKMEN_TO_TURKISH) if lang.code == "tk" else text
+
+
 async def _edge_tts(voice: str, text: str, out: Path) -> None:
     await edge_tts.Communicate(text, voice).save(str(out))
     if not out.exists() or out.stat().st_size == 0:
@@ -99,7 +107,7 @@ async def synthesize(
             for attempt in range(1, TTS_ATTEMPTS + 1):
                 try:
                     if engine == "edge":
-                        await _edge_tts(edge_voice, seg.translation, raw)
+                        await _edge_tts(edge_voice, speakable(seg.translation, target), raw)
                     else:
                         await _openai_tts(client, model, voice, seg.translation, target, raw)
                     break

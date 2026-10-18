@@ -375,8 +375,30 @@ ProtectSystem=full
 [Install]
 WantedBy=multi-user.target
 EOF
+    # Кнопка «Обновить бота»: бот (без прав root) кладёт файл-запрос, systemd замечает его
+    # и запускает обновление от root.
+    cat >"/etc/systemd/system/$SERVICE-update.service" <<EOF
+[Unit]
+Description=VideoTranslaterBot update requested from Telegram
+
+[Service]
+Type=oneshot
+ExecStart=$CLI self-update
+EOF
+    cat >"/etc/systemd/system/$SERVICE-update.path" <<EOF
+[Unit]
+Description=Watch for VideoTranslaterBot update requests
+
+[Path]
+PathExists=$APP_DIR/data/update.request
+Unit=$SERVICE-update.service
+
+[Install]
+WantedBy=multi-user.target
+EOF
     systemctl daemon-reload
     systemctl enable --quiet "$SERVICE"
+    systemctl enable --quiet --now "$SERVICE-update.path"
 }
 
 install_cli() {
@@ -471,12 +493,17 @@ configure_local_models() {
     local force="$1" whisper nllb mem cores
     whisper="$(env_get TRANSCRIBE_MODEL)"
     nllb="$(env_get TRANSLATE_MODEL)"
-    if [[ "$force" != 1 && " $LOCAL_WHISPER_MODELS " == *" $whisper "* && "$nllb" == *nllb* ]]; then
-        return 0
-    fi
     mem="$(mem_total_mb)"
     cores="$(nproc)"
-    if (( mem >= 7000 )); then
+    if [[ "$force" != 1 && " $LOCAL_WHISPER_MODELS " == *" $whisper "* && "$nllb" == *nllb* ]]; then
+        # Более точная модель перевода, если памяти хватает (раньше её ставили только от 7 ГБ).
+        if [[ "$nllb" == "$NLLB_SMALL" ]] && (( mem >= 5000 )); then
+            env_set TRANSLATE_MODEL "$NLLB_LARGE"
+            ok "Памяти достаточно — включаю более точную модель перевода: ${NLLB_LARGE#*/}"
+        fi
+        return 0
+    fi
+    if (( mem >= 5000 )); then
         whisper=large-v3-turbo nllb="$NLLB_LARGE"
     elif (( mem >= 3500 )); then
         whisper=large-v3-turbo nllb="$NLLB_SMALL"
@@ -537,6 +564,11 @@ clear_openai_defaults() {
     done
 }
 
+write_version() {
+    version_string >"$APP_DIR/data/version.txt"
+    chown "$APP_USER:$APP_USER" "$APP_DIR/data/version.txt"
+}
+
 # Общий хвост установки и обновления. Настройки спрашиваются, только если чего-то не хватает.
 finish_setup() {
     # Старые установки работали только через OpenAI — не переключаем их в бесплатный режим.
@@ -549,6 +581,7 @@ finish_setup() {
     clear_openai_defaults
     prepare_dirs
     prefetch_models || return 1
+    write_version
     install_cli
     write_service
     start_and_verify
@@ -557,6 +590,23 @@ finish_setup() {
 rollback() {
     git -C "$APP_DIR" reset --quiet --hard "$1"
     install_python_deps || true
+    write_version || true
+}
+
+# Запускается systemd по кнопке «Обновить бота» в Telegram; результат читает бот.
+cmd_self_update() {
+    require_root
+    require_installed
+    local data="$APP_DIR/data" status
+    rm -f "$data/update.request" "$data/update.result"
+    if (cmd_update) >"$data/update.log" 2>&1; then
+        if grep -q "Уже установлена последняя версия" "$data/update.log"; then status=latest; else status=updated; fi
+    else
+        status=failed
+    fi
+    printf 'status=%s\nversion=%s\n' "$status" "$(version_string)" >"$data/update.result.tmp"
+    chown "$APP_USER:$APP_USER" "$data/update.result.tmp" "$data/update.log"
+    mv "$data/update.result.tmp" "$data/update.result"
 }
 
 cmd_config() {
@@ -612,7 +662,9 @@ cmd_uninstall() {
     confirm "Удалить бота вместе с настройками и данными?" n || { echo "Отменено."; return 0; }
     if has_systemd; then
         systemctl disable --now "$SERVICE" >/dev/null 2>&1 || true
-        rm -f "/etc/systemd/system/$SERVICE.service"
+        systemctl disable --now "$SERVICE-update.path" >/dev/null 2>&1 || true
+        rm -f "/etc/systemd/system/$SERVICE.service" "/etc/systemd/system/$SERVICE-update.service" \
+            "/etc/systemd/system/$SERVICE-update.path"
         systemctl daemon-reload
     fi
     if command -v docker >/dev/null; then docker rm -f "$BOT_API_CONTAINER" >/dev/null 2>&1 || true; fi
@@ -661,6 +713,7 @@ main() {
             ;;
         install)   cmd_install "$@" ;;
         update)    cmd_update "$@" ;;
+        self-update) cmd_self_update ;;
         config)    cmd_config "$@" ;;
         bigfiles)  cmd_bigfiles "$@" ;;
         uninstall) cmd_uninstall "$@" ;;

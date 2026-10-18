@@ -25,16 +25,22 @@ class ModeCb(CallbackData, prefix="mode"):
     mode: str
 
 
+class UpdateCb(CallbackData, prefix="upd"):
+    action: str  # confirm | cancel
+
+
 class NavCb(CallbackData, prefix="nav"):
     action: str  # back | cancel | start | abort
 
 
-def main_menu(lang: str) -> ReplyKeyboardMarkup:
+def main_menu(lang: str, is_admin: bool = False) -> ReplyKeyboardMarkup:
     kb = ReplyKeyboardBuilder()
     kb.button(text=t(lang, "btn_translate"))
     kb.button(text=t(lang, "btn_language"))
     kb.button(text=t(lang, "btn_help"))
-    kb.adjust(1, 2)
+    if is_admin:
+        kb.button(text=t(lang, "btn_update"))
+    kb.adjust(1, 2, 1)
     return kb.as_markup(resize_keyboard=True, is_persistent=True)
 
 
@@ -98,6 +104,14 @@ def confirm(lang: str) -> InlineKeyboardMarkup:
     kb.button(text=t(lang, "btn_start"), callback_data=NavCb(action="start"))
     kb.adjust(1)
     _nav_row(kb, lang, back=True)
+    return kb.as_markup()
+
+
+def update_confirm(lang: str) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text=t(lang, "btn_update_yes"), callback_data=UpdateCb(action="confirm"))
+    kb.button(text=t(lang, "btn_cancel"), callback_data=UpdateCb(action="cancel"))
+    kb.adjust(2)
     return kb.as_markup()
 
 

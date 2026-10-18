@@ -17,6 +17,7 @@ from .i18n import UI_LANGUAGES
 from .jobs import JobManager
 from .middlewares import UserContextMiddleware
 from .storage import UserStorage
+from .updater import Updater
 
 COMMANDS = {
     "ru": [("start", "Запустить бота"), ("translate", "Перевести видео"), ("menu", "Главное меню"),
@@ -54,7 +55,9 @@ async def main() -> None:
         )
     jobs = JobManager(bot, config, client)
 
-    dp = Dispatcher(storage=MemoryStorage(), config=config, user_storage=storage, jobs=jobs)
+    updater = Updater(bot, config.data_dir)
+    updater.resume()  # report an update that restarted the bot
+    dp = Dispatcher(storage=MemoryStorage(), config=config, user_storage=storage, jobs=jobs, updater=updater)
     middleware = UserContextMiddleware(config, storage)
     dp.message.outer_middleware(middleware)
     dp.callback_query.outer_middleware(middleware)

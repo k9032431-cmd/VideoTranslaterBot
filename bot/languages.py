@@ -35,6 +35,8 @@ LANGUAGES: tuple[Language, ...] = (
     Language("tr", "🇹🇷", "Türkçe", "Turkish", "tr-TR-AhmetNeural", "tr-TR-EmelNeural", "tur_Latn"),
     Language("kk", "🇰🇿", "Қазақша", "Kazakh", "kk-KZ-DauletNeural", "kk-KZ-AigulNeural", "kaz_Cyrl"),
     Language("uz", "🇺🇿", "Oʻzbekcha", "Uzbek", "uz-UZ-SardorNeural", "uz-UZ-MadinaNeural", "uzn_Latn"),
+    # Microsoft has no Turkmen voice; the closely related Turkish one reads Turkmen text (see dubbing).
+    Language("tk", "🇹🇲", "Türkmençe", "Turkmen", "tr-TR-AhmetNeural", "tr-TR-EmelNeural", "tuk_Latn"),
     Language("ar", "🇸🇦", "العربية", "Arabic", "ar-SA-HamedNeural", "ar-SA-ZariyahNeural", "arb_Arab"),
     Language("zh", "🇨🇳", "中文", "Chinese (Simplified)", "zh-CN-YunxiNeural", "zh-CN-XiaoxiaoNeural", "zho_Hans"),
     Language("ja", "🇯🇵", "日本語", "Japanese", "ja-JP-KeitaNeural", "ja-JP-NanamiNeural", "jpn_Jpan"),

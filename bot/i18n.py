@@ -89,6 +89,26 @@ TEXTS: dict[str, dict[str, str]] = {
         ),
         "bad_api_key": "ключ API не подходит — владельцу бота нужно выполнить vtbot config",
         "unsupported_language": "⚠️ Не удалось определить язык видео. Выберите его вручную из списка.",
+        "btn_update": "🔄 Обновить бота",
+        "btn_update_yes": "✅ Обновить",
+        "update_confirm": (
+            "🔄 Обновить бота до последней версии?\n\n"
+            "Сейчас установлена: <code>{version}</code>\n\n"
+            "Бот перезапустится на минуту, идущие переводы прервутся."
+        ),
+        "update_started": "⏳ Обновляю… Это займёт 1–5 минут, я напишу, когда закончу.",
+        "update_in_progress": "⏳ Обновление уже идёт, дождитесь сообщения о результате.",
+        "update_done": "✅ Бот обновлён!\n\nВерсия: <code>{version}</code>",
+        "update_latest": "✔ У вас уже последняя версия: <code>{version}</code>",
+        "update_failed": (
+            "❌ Обновить не получилось — бот продолжает работать на прежней версии.\n\n"
+            "Последние строки журнала:\n<pre>{log}</pre>"
+        ),
+        "update_unavailable": (
+            "⚠️ Кнопка обновления заработает после одного обновления вручную. "
+            "Выполните на сервере: <code>vtbot update</code>"
+        ),
+        "update_timeout": "⚠️ Обновление идёт слишком долго. Проверьте на сервере: <code>vtbot status</code>",
     },
     "en": {
         "choose_ui_language": "🌐 Choose the bot language:",
@@ -171,6 +191,26 @@ TEXTS: dict[str, dict[str, str]] = {
         ),
         "bad_api_key": "the API key was rejected — the bot owner needs to run vtbot config",
         "unsupported_language": "⚠️ Couldn't recognize the video's language. Please pick it from the list.",
+        "btn_update": "🔄 Update the bot",
+        "btn_update_yes": "✅ Update",
+        "update_confirm": (
+            "🔄 Update the bot to the latest version?\n\n"
+            "Installed now: <code>{version}</code>\n\n"
+            "The bot will restart for a minute and running translations will stop."
+        ),
+        "update_started": "⏳ Updating… This takes 1–5 minutes, I'll message you when it's done.",
+        "update_in_progress": "⏳ An update is already running, please wait for the result.",
+        "update_done": "✅ The bot has been updated!\n\nVersion: <code>{version}</code>",
+        "update_latest": "✔ You already have the latest version: <code>{version}</code>",
+        "update_failed": (
+            "❌ The update failed — the bot keeps running the previous version.\n\n"
+            "Last log lines:\n<pre>{log}</pre>"
+        ),
+        "update_unavailable": (
+            "⚠️ The update button starts working after one manual update. "
+            "Run on the server: <code>vtbot update</code>"
+        ),
+        "update_timeout": "⚠️ The update is taking too long. Check on the server: <code>vtbot status</code>",
     },
     "uk": {
         "choose_ui_language": "🌐 Оберіть мову бота:",
@@ -253,6 +293,26 @@ TEXTS: dict[str, dict[str, str]] = {
         ),
         "bad_api_key": "ключ API не підходить — власнику бота потрібно виконати vtbot config",
         "unsupported_language": "⚠️ Не вдалося визначити мову відео. Оберіть її вручну зі списку.",
+        "btn_update": "🔄 Оновити бота",
+        "btn_update_yes": "✅ Оновити",
+        "update_confirm": (
+            "🔄 Оновити бота до останньої версії?\n\n"
+            "Зараз встановлено: <code>{version}</code>\n\n"
+            "Бот перезапуститься на хвилину, поточні переклади перервуться."
+        ),
+        "update_started": "⏳ Оновлюю… Це займе 1–5 хвилин, я напишу, коли закінчу.",
+        "update_in_progress": "⏳ Оновлення вже триває, дочекайтеся повідомлення про результат.",
+        "update_done": "✅ Бота оновлено!\n\nВерсія: <code>{version}</code>",
+        "update_latest": "✔ У вас уже остання версія: <code>{version}</code>",
+        "update_failed": (
+            "❌ Оновити не вдалося — бот працює на попередній версії.\n\n"
+            "Останні рядки журналу:\n<pre>{log}</pre>"
+        ),
+        "update_unavailable": (
+            "⚠️ Кнопка оновлення запрацює після одного оновлення вручну. "
+            "Виконайте на сервері: <code>vtbot update</code>"
+        ),
+        "update_timeout": "⚠️ Оновлення триває надто довго. Перевірте на сервері: <code>vtbot status</code>",
     },
 }
 

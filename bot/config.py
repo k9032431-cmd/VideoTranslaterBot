@@ -57,6 +57,7 @@ class Config:
     tts_gender: str  # male | female (Edge voices)
 
     allowed_user_ids: frozenset[int]
+    admin_user_ids: frozenset[int]  # may update the bot from Telegram
     max_video_minutes: int
     max_concurrent_jobs: int
     original_volume: float
@@ -120,6 +121,7 @@ def load_config() -> Config:
         tts_voice=_str("TTS_VOICE", "onyx"),
         tts_gender="female" if _str("TTS_GENDER", "male").lower() == "female" else "male",
         allowed_user_ids=_ids("ALLOWED_USER_IDS"),
+        admin_user_ids=_ids("ADMIN_USER_IDS") or _ids("ALLOWED_USER_IDS"),
         max_video_minutes=_int("MAX_VIDEO_MINUTES", 180),
         max_concurrent_jobs=_int("MAX_CONCURRENT_JOBS", 2),
         original_volume=_float("ORIGINAL_VOLUME", 0.15),

@@ -86,7 +86,7 @@ def _local_config(tmp: Path):
         telegram_api_url=None, telegram_api_local=True,
         transcribe_model="small", translate_model="nllb-test", translate_reasoning_effort="",
         tts_engine="edge", tts_model="", tts_voice="", tts_gender="male",
-        allowed_user_ids=frozenset(), max_video_minutes=180, max_concurrent_jobs=1,
+        allowed_user_ids=frozenset(), admin_user_ids=frozenset(), max_video_minutes=180, max_concurrent_jobs=1,
         original_volume=0.25, data_dir=tmp,
     )
 

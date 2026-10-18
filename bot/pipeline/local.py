@@ -123,7 +123,36 @@ async def transcribe(
         return result, info.language
 
     segments, detected = await _run_in_thread(work, on_progress)
-    return _merge_duplicates(segments), detected
+    return merge_sentences(_merge_duplicates(segments)), detected
+
+
+SENTENCE_END = (".", "!", "?", "…", "。", "！", "？", "»", '"')
+MAX_SENTENCE_SECONDS = 15.0
+MAX_SENTENCE_CHARS = 250
+MAX_PAUSE = 1.5
+
+
+def merge_sentences(segments: list[Segment]) -> list[Segment]:
+    """Join Whisper fragments into whole sentences.
+
+    NLLB translates every piece on its own, without context, so a sentence cut in two
+    is translated as two broken halves. Subtitles split long sentences back into cues.
+    """
+    merged: list[Segment] = []
+    for seg in segments:
+        last = merged[-1] if merged else None
+        if (
+            last is not None
+            and not last.text.rstrip().endswith(SENTENCE_END)
+            and seg.start - last.end <= MAX_PAUSE
+            and seg.end - last.start <= MAX_SENTENCE_SECONDS
+            and len(last.text) + len(seg.text) < MAX_SENTENCE_CHARS
+        ):
+            last.text = f"{last.text.rstrip()} {seg.text.lstrip()}"
+            last.end = seg.end
+        else:
+            merged.append(Segment(seg.start, seg.end, seg.text))
+    return merged
 
 
 async def translate(
@@ -150,9 +179,10 @@ async def translate(
             results = translator.translate_batch(
                 sources,
                 target_prefix=[[target.nllb]] * len(batch),
-                beam_size=4,
+                beam_size=5,
                 max_decoding_length=256,
                 repetition_penalty=1.1,
+                no_repeat_ngram_size=4,  # NLLB sometimes loops on a phrase
             )
             for seg, res in zip(batch, results):
                 tokens = res.hypotheses[0][1:]  # drop the target language token

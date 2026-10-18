@@ -73,7 +73,7 @@ async def env(tmp_path: Path):
     config = Config(
         bot_token="42:TEST", provider="openai", ai_api_key="x", ai_base_url=None, telegram_api_url=None,
         telegram_api_local=True, transcribe_model="w", translate_model="m", translate_reasoning_effort="", tts_engine="openai", tts_model="t", tts_voice="v", tts_gender="male",
-        allowed_user_ids=frozenset(), max_video_minutes=180, max_concurrent_jobs=1, original_volume=0.2,
+        allowed_user_ids=frozenset(), admin_user_ids=frozenset(), max_video_minutes=180, max_concurrent_jobs=1, original_volume=0.2,
         data_dir=tmp_path,
     )
     storage = UserStorage(config.db_path)
@@ -81,7 +81,9 @@ async def env(tmp_path: Path):
     session = FakeSession()
     bot = Bot("42:TEST", session=session)
     jobs = FakeJobs()
-    dp = Dispatcher(storage=MemoryStorage(), config=config, user_storage=storage, jobs=jobs)
+    from bot.updater import Updater
+    updater = Updater(bot, tmp_path)
+    dp = Dispatcher(storage=MemoryStorage(), config=config, user_storage=storage, jobs=jobs, updater=updater)
     middleware = UserContextMiddleware(config, storage)
     dp.message.outer_middleware(middleware)
     dp.callback_query.outer_middleware(middleware)
@@ -188,3 +190,29 @@ async def test_access_restricted(env, tmp_path):
     object.__setattr__(config, "allowed_user_ids", frozenset({1}))
     await dp.feed_update(bot, _message(text="/start"))
     assert session.texts()[-1] == t("ru", "access_denied")
+
+
+async def test_admin_update_button(env, tmp_path):
+    dp, bot, session, _, config = env
+    await dp.feed_update(bot, _message(text="/start"))
+    await dp.feed_update(bot, _callback(keyboards.UiLangCb(lang="ru").pack()))
+
+    def reply_buttons():
+        for r in reversed(session.requests):
+            rows = getattr(getattr(r, "reply_markup", None), "keyboard", None)
+            if rows:
+                return [b.text for row in rows for b in row]
+        return []
+
+    assert t("ru", "btn_update") not in reply_buttons()  # not an admin
+    await dp.feed_update(bot, _message(text=t("ru", "btn_update")))
+    assert t("ru", "update_confirm", version="?") not in session.texts()
+
+    object.__setattr__(config, "admin_user_ids", frozenset({USER.id}))
+    await dp.feed_update(bot, _message(text="/menu"))
+    assert t("ru", "btn_update") in reply_buttons()
+    await dp.feed_update(bot, _message(text=t("ru", "btn_update")))
+    assert session.texts()[-1] == t("ru", "update_confirm", version="?")
+    await dp.feed_update(bot, _callback(keyboards.UpdateCb(action="confirm").pack()))
+    assert session.texts()[-1] == t("ru", "update_started")
+    assert (tmp_path / "update.request").read_text().strip() == str(CHAT.id)

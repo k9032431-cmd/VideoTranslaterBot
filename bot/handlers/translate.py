@@ -57,13 +57,13 @@ async def start_flow(message: Message, state: FSMContext, lang: str, jobs: JobMa
 
 
 @router.message(Command("cancel"))
-async def cmd_cancel(message: Message, state: FSMContext, lang: str, jobs: JobManager) -> None:
+async def cmd_cancel(message: Message, state: FSMContext, lang: str, jobs: JobManager, is_admin: bool) -> None:
     had_state = await state.get_state() is not None
     await state.clear()
     if jobs.cancel(message.from_user.id) or had_state:
-        await message.answer(t(lang, "cancelled"), reply_markup=keyboards.main_menu(lang))
+        await message.answer(t(lang, "cancelled"), reply_markup=keyboards.main_menu(lang, is_admin))
     else:
-        await message.answer(t(lang, "nothing_to_cancel"), reply_markup=keyboards.main_menu(lang))
+        await message.answer(t(lang, "nothing_to_cancel"), reply_markup=keyboards.main_menu(lang, is_admin))
 
 
 @router.message(F.video | F.video_note | F.document)
@@ -222,5 +222,5 @@ async def on_stale(callback: CallbackQuery, lang: str) -> None:
 
 
 @router.message()
-async def on_other(message: Message, lang: str) -> None:
-    await message.answer(t(lang, "menu"), reply_markup=keyboards.main_menu(lang))
+async def on_other(message: Message, lang: str, is_admin: bool) -> None:
+    await message.answer(t(lang, "menu"), reply_markup=keyboards.main_menu(lang, is_admin))

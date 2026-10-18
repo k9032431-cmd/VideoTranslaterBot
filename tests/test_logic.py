@@ -19,7 +19,7 @@ def test_every_ui_language_has_every_key():
 
 def test_ui_texts_format_without_errors():
     sample = dict(max_mb=1, max_min=1, size_mb=1, minutes=1, name="x", duration="", source="a",
-                  target="b", mode="m", progress="1%", error="e")
+                  target="b", mode="m", progress="1%", error="e", version="v", log="l")
     for lang in i18n.TEXTS:
         for key in i18n.TEXTS[lang]:
             i18n.t(lang, key, **sample)
@@ -209,7 +209,44 @@ async def test_translate_passes_reasoning_effort():
 
 def test_every_language_has_edge_voices():
     for lang in languages.LANGUAGES:
-        assert lang.edge_male.startswith(lang.code + "-") and lang.edge_female.startswith(lang.code + "-")
+        voice_lang = "tr" if lang.code == "tk" else lang.code  # no Turkmen voice exists; Turkish reads it
+        assert lang.edge_male.startswith(voice_lang + "-") and lang.edge_female.startswith(voice_lang + "-")
+
+
+def test_turkmen_is_available():
+    tk = languages.get("tk")
+    assert tk.nllb == "tuk_Latn" and tk.label == "🇹🇲 Türkmençe"
+    assert languages.from_whisper("turkmen").code == "tk"
+
+
+def test_turkmen_text_is_made_speakable_for_turkish_voice():
+    from bot.pipeline.dubbing import speakable
+    assert speakable("Näme üçin ýöne şeýle?", languages.get("tk")) == "Neme üçin yöne şeyle?"
+    assert speakable("Näme", languages.get("de")) == "Näme"
+
+
+def test_merge_sentences():
+    from bot.pipeline.local import merge_sentences
+    segs = [
+        Segment(0.0, 1.5, "Вчера вечером мы с другом"),
+        Segment(1.6, 3.0, "пошли в кино."),
+        Segment(3.2, 4.0, "Было интересно!"),
+        Segment(7.0, 8.0, "А потом"),  # long pause before → new sentence
+        Segment(8.1, 9.0, "мы пошли домой"),
+    ]
+    merged = merge_sentences(segs)
+    assert [m.text for m in merged] == [
+        "Вчера вечером мы с другом пошли в кино.", "Было интересно!", "А потом мы пошли домой",
+    ]
+    assert (merged[0].start, merged[0].end) == (0.0, 3.0)
+
+
+def test_merge_sentences_respects_length_limit():
+    from bot.pipeline.local import MAX_SENTENCE_SECONDS, merge_sentences
+    segs = [Segment(i * 2.0, i * 2.0 + 1.9, f"слово{i}") for i in range(20)]
+    merged = merge_sentences(segs)
+    assert len(merged) > 1
+    assert all(m.end - m.start <= MAX_SENTENCE_SECONDS for m in merged)
 
 
 def test_every_language_has_nllb_code():

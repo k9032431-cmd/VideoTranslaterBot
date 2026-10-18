@@ -37,5 +37,6 @@ class UserContextMiddleware(BaseMiddleware):
             return None
 
         data["lang"] = lang
+        data["is_admin"] = user.id in self.config.admin_user_ids
         data["has_lang"] = stored is not None
         return await handler(event, data)
