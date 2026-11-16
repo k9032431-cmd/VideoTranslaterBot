@@ -254,3 +254,9 @@ async def test_bad_link_is_explained(env, monkeypatch):
     await dp.feed_update(bot, _message(text="https://youtube.com/watch?v=x"))
     assert session.texts()[-1] == t("ru", "link_bot_check")
     assert not jobs.started
+
+
+async def test_cookies_command_tells_non_admin_their_id(env):
+    dp, bot, session, _, _ = env
+    await dp.feed_update(bot, _message(text="/cookies"))
+    assert session.texts()[-1] == t("ru", "admin_only", user_id=USER.id)

@@ -102,6 +102,7 @@ async def cmd_cookies(
 ) -> None:
     """YouTube refuses servers without a signed-in account: the admin can hand over its cookies."""
     if not is_admin:
+        await message.answer(t(lang, "admin_only", user_id=message.from_user.id))
         return
     if (command.args or "").strip().lower() in ("delete", "off", "удалить"):
         config.cookies_path.unlink(missing_ok=True)

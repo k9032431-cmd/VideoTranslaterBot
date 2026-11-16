@@ -118,6 +118,11 @@ TEXTS: dict[str, dict[str, str]] = {
         "cookies_saved": "✅ Cookies сохранены, файл удалён из чата. Пробуйте ссылку YouTube.",
         "cookies_invalid": "⚠️ Это не похоже на cookies.txt с YouTube. Экспортируйте его на открытой странице youtube.com.",
         "cookies_deleted": "🗑 Cookies удалены.",
+        "admin_only": (
+            "🔒 Эта команда только для администратора бота.\n\n"
+            "Ваш Telegram id: <code>{user_id}</code>\n"
+            "Чтобы стать администратором, выполните на сервере <code>vtbot config</code> и впишите этот id."
+        ),
         "error_generic": "внутренняя ошибка",
         "rate_limited": (
             "⏳ Закончился лимит API: дневной лимит бесплатного тарифа или баланс OpenAI.\n\n"
@@ -256,6 +261,11 @@ TEXTS: dict[str, dict[str, str]] = {
         "cookies_saved": "✅ Cookies saved and the file removed from the chat. Try a YouTube link.",
         "cookies_invalid": "⚠️ That doesn't look like a YouTube cookies.txt. Export it on an open youtube.com page.",
         "cookies_deleted": "🗑 Cookies removed.",
+        "admin_only": (
+            "🔒 This command is for the bot's admin only.\n\n"
+            "Your Telegram id: <code>{user_id}</code>\n"
+            "To become the admin, run <code>vtbot config</code> on the server and enter this id."
+        ),
         "error_generic": "internal error",
         "rate_limited": (
             "⏳ The API limit is used up: the free tier's daily limit or the OpenAI balance.\n\n"
@@ -394,6 +404,11 @@ TEXTS: dict[str, dict[str, str]] = {
         "cookies_saved": "✅ Cookies збережено, файл видалено з чату. Пробуйте посилання YouTube.",
         "cookies_invalid": "⚠️ Це не схоже на cookies.txt з YouTube. Експортуйте його на відкритій сторінці youtube.com.",
         "cookies_deleted": "🗑 Cookies видалено.",
+        "admin_only": (
+            "🔒 Ця команда тільки для адміністратора бота.\n\n"
+            "Ваш Telegram id: <code>{user_id}</code>\n"
+            "Щоб стати адміністратором, виконайте на сервері <code>vtbot config</code> і впишіть цей id."
+        ),
         "error_generic": "внутрішня помилка",
         "rate_limited": (
             "⏳ Закінчився ліміт API: денний ліміт безкоштовного тарифу або баланс OpenAI.\n\n"
