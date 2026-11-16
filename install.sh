@@ -345,6 +345,19 @@ configure() {
     [[ -z "$ids" || "$ids" =~ ^[0-9]+(,[0-9]+)*$ ]] || die "ALLOWED_USER_IDS: только числа через запятую."
     env_set ALLOWED_USER_IDS "$ids"
 
+    # Администратор видит кнопку «🔄 Обновить бота». Без него (бот открыт всем) её не видит никто.
+    local admin="${ADMIN_USER_IDS:-}"
+    if [[ -z "$admin" && -z "$ids" && -z "$(env_get ADMIN_USER_IDS)" && -r /dev/tty ]]; then
+        echo
+        echo "Бот открыт всем, поэтому нужен ваш id администратора — для кнопки «🔄 Обновить бота»."
+        admin="$(ask "Ваш Telegram id (из @userinfobot)")"
+    fi
+    admin="${admin// /}"
+    if [[ -n "$admin" ]]; then
+        [[ "$admin" =~ ^[0-9]+(,[0-9]+)*$ ]] || die "ADMIN_USER_IDS: только числа через запятую."
+        env_set ADMIN_USER_IDS "$admin"
+    fi
+
     secure_env
     config_complete || die "Настройка не завершена: нет токена бота или ключа."
     ok "Настройки сохранены в $(ENV_FILE)"
