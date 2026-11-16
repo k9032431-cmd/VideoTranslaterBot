@@ -7,6 +7,7 @@ class Segment:
     end: float
     text: str
     translation: str = ""
+    speaker: int | None = None  # set in multi-voice mode
 
     @property
     def duration(self) -> float:

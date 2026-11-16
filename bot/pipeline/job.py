@@ -10,7 +10,7 @@ from openai import AsyncOpenAI
 from .. import languages
 from ..config import Config
 from ..languages import Language
-from . import dubbing, local, media, render, subtitles, transcribe, translate
+from . import dubbing, local, media, render, speakers, subtitles, transcribe, translate, voices
 
 log = logging.getLogger(__name__)
 
@@ -54,8 +54,9 @@ def _language(code: str | None) -> Language:
 async def run_job(client: AsyncOpenAI | None, config: Config, params: JobParams, report: Reporter) -> JobResult:
     work = params.work_dir
     target = languages.get(params.target)
-    voice = params.mode in ("voice", "both")
-    burn_subs = params.mode in ("subtitles", "both")
+    voice = params.mode in ("voice", "both", "multi", "multi_both")
+    multi = params.mode in ("multi", "multi_both")
+    burn_subs = params.mode in ("subtitles", "both", "multi_both")
 
     await report("stage_audio", None)
     if not await media.has_audio(params.video):
@@ -76,9 +77,19 @@ async def run_job(client: AsyncOpenAI | None, config: Config, params: JobParams,
             client, config.transcribe_model, speech, work, language,
             on_progress=lambda p: report("stage_transcribe", p),
         )
-    speech.unlink(missing_ok=True)
     if not segments:
         raise NoSpeechError
+
+    found_speakers: dict[int, speakers.Speaker] = {}
+    if multi:
+        await report("stage_speakers", 0.0)
+        found_speakers = await speakers.assign(
+            speech, segments, config.models_dir, on_progress=lambda p: report("stage_speakers", p),
+        )
+    speech.unlink(missing_ok=True)
+    if config.provider == "local":
+        # NLLB translates each piece without context: give it whole sentences (one speaker each).
+        segments = local.merge_sentences(segments)
     source = _language(detected) if params.source == "auto" else languages.get(params.source)
     if source.code == target.code:
         raise SameLanguageError
@@ -103,8 +114,15 @@ async def run_job(client: AsyncOpenAI | None, config: Config, params: JobParams,
     dub_track: Path | None = None
     if voice:
         await report("stage_tts", 0.0)
+        if multi:
+            segment_voices = await voices.per_segment(
+                config.tts_engine, target, segments, found_speakers, config.tts_voice,
+            )
+        else:
+            one = await voices.single_voice(config.tts_engine, target, config.tts_gender, config.tts_voice)
+            segment_voices = [one] * len(segments)
         dub_track = await dubbing.synthesize(
-            client, config.tts_engine, config.tts_model, config.tts_voice, config.tts_gender,
+            client, config.tts_engine, config.tts_model, segment_voices,
             segments, target, work, total,
             on_progress=lambda p: report("stage_tts", p),
         )

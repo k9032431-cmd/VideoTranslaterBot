@@ -84,8 +84,7 @@ async def synthesize(
     client: AsyncOpenAI,
     engine: str,  # edge | openai
     model: str,
-    voice: str,  # OpenAI voice
-    gender: str,  # male | female, for Edge voices
+    segment_voices: list[str],  # voice for each segment (Edge or OpenAI voice name)
     segments: list[Segment],
     target: Language,
     work_dir: Path,
@@ -95,7 +94,6 @@ async def synthesize(
     """Return a WAV track as long as the video with the voice-over in place."""
     tts_dir = work_dir / "tts"
     tts_dir.mkdir(exist_ok=True)
-    edge_voice = target.edge_female if gender == "female" else target.edge_male
     semaphore = asyncio.Semaphore(TTS_CONCURRENCY)
     done = 0
     lock = asyncio.Lock()
@@ -103,11 +101,12 @@ async def synthesize(
     async def one(index: int, seg: Segment) -> Path:
         nonlocal done
         raw = tts_dir / f"{index:05d}.mp3"
+        voice = segment_voices[index]
         async with semaphore:
             for attempt in range(1, TTS_ATTEMPTS + 1):
                 try:
                     if engine == "edge":
-                        await _edge_tts(edge_voice, speakable(seg.translation, target), raw)
+                        await _edge_tts(voice, speakable(seg.translation, target), raw)
                     else:
                         await _openai_tts(client, model, voice, seg.translation, target, raw)
                     break

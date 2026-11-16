@@ -36,6 +36,8 @@ TEXTS: dict[str, dict[str, str]] = {
             "<b>Форматы перевода</b>\n"
             "📝 <b>Субтитры</b> — перевод вшивается в видео, плюс отдельный файл .srt.\n"
             "🎙 <b>Озвучка</b> — закадровый голос на новом языке, оригинал звучит тише.\n"
+            "🎭 <b>Многоголосая озвучка</b> — бот различает говорящих: у каждого свой голос "
+            "(мужской или женский, как в оригинале).\n"
             "🎙📝 <b>Озвучка + субтитры</b> — и то и другое.\n\n"
             "Команды: /start, /menu, /language, /cancel"
         ),
@@ -48,8 +50,10 @@ TEXTS: dict[str, dict[str, str]] = {
         "choose_target": "🌍 На какой язык перевести?",
         "choose_mode": "🎞 Как оформить перевод?",
         "mode_subtitles": "📝 Субтитры",
-        "mode_voice": "🎙 Озвучка",
+        "mode_voice": "🎙 Озвучка (один голос)",
+        "mode_multi": "🎭 Многоголосая озвучка",
         "mode_both": "🎙📝 Озвучка + субтитры",
+        "mode_multi_both": "🎭📝 Многоголосая + субтитры",
         "summary": (
             "📋 <b>Проверьте, всё ли верно:</b>\n\n"
             "🎬 Видео: <b>{name}</b>\n"
@@ -68,6 +72,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "stage_audio": "🎧 Извлекаю звук…",
         "stage_transcribe": "📝 Распознаю речь… {progress}",
         "stage_translate": "🌍 Перевожу… {progress}",
+        "stage_speakers": "🎭 Различаю голоса… {progress}",
         "stage_tts": "🎙 Озвучиваю… {progress}",
         "stage_render": "🎞 Собираю видео… {progress}",
         "stage_upload": "📤 Отправляю результат…",
@@ -138,6 +143,8 @@ TEXTS: dict[str, dict[str, str]] = {
             "<b>Translation formats</b>\n"
             "📝 <b>Subtitles</b> — burned into the video, plus a separate .srt file.\n"
             "🎙 <b>Voice-over</b> — a voice in the new language, the original plays quieter.\n"
+            "🎭 <b>Multi-voice voice-over</b> — the bot tells speakers apart and gives each "
+            "their own voice (male or female, as in the original).\n"
             "🎙📝 <b>Voice-over + subtitles</b> — both.\n\n"
             "Commands: /start, /menu, /language, /cancel"
         ),
@@ -150,8 +157,10 @@ TEXTS: dict[str, dict[str, str]] = {
         "choose_target": "🌍 Which language should it be translated into?",
         "choose_mode": "🎞 How should the translation be delivered?",
         "mode_subtitles": "📝 Subtitles",
-        "mode_voice": "🎙 Voice-over",
+        "mode_voice": "🎙 Voice-over (one voice)",
+        "mode_multi": "🎭 Multi-voice voice-over",
         "mode_both": "🎙📝 Voice-over + subtitles",
+        "mode_multi_both": "🎭📝 Multi-voice + subtitles",
         "summary": (
             "📋 <b>Please check everything:</b>\n\n"
             "🎬 Video: <b>{name}</b>\n"
@@ -170,6 +179,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "stage_audio": "🎧 Extracting audio…",
         "stage_transcribe": "📝 Recognizing speech… {progress}",
         "stage_translate": "🌍 Translating… {progress}",
+        "stage_speakers": "🎭 Telling voices apart… {progress}",
         "stage_tts": "🎙 Voicing… {progress}",
         "stage_render": "🎞 Rendering the video… {progress}",
         "stage_upload": "📤 Sending the result…",
@@ -240,6 +250,8 @@ TEXTS: dict[str, dict[str, str]] = {
             "<b>Формати перекладу</b>\n"
             "📝 <b>Субтитри</b> — переклад вшивається у відео, плюс окремий файл .srt.\n"
             "🎙 <b>Озвучення</b> — закадровий голос новою мовою, оригінал звучить тихіше.\n"
+            "🎭 <b>Багатоголосе озвучення</b> — бот розрізняє мовців: у кожного свій голос "
+            "(чоловічий або жіночий, як в оригіналі).\n"
             "🎙📝 <b>Озвучення + субтитри</b> — і те, і інше.\n\n"
             "Команди: /start, /menu, /language, /cancel"
         ),
@@ -252,8 +264,10 @@ TEXTS: dict[str, dict[str, str]] = {
         "choose_target": "🌍 Якою мовою перекласти?",
         "choose_mode": "🎞 Як оформити переклад?",
         "mode_subtitles": "📝 Субтитри",
-        "mode_voice": "🎙 Озвучення",
+        "mode_voice": "🎙 Озвучення (один голос)",
+        "mode_multi": "🎭 Багатоголосе озвучення",
         "mode_both": "🎙📝 Озвучення + субтитри",
+        "mode_multi_both": "🎭📝 Багатоголосе + субтитри",
         "summary": (
             "📋 <b>Перевірте, чи все правильно:</b>\n\n"
             "🎬 Відео: <b>{name}</b>\n"
@@ -272,6 +286,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "stage_audio": "🎧 Видобуваю звук…",
         "stage_transcribe": "📝 Розпізнаю мовлення… {progress}",
         "stage_translate": "🌍 Перекладаю… {progress}",
+        "stage_speakers": "🎭 Розрізняю голоси… {progress}",
         "stage_tts": "🎙 Озвучую… {progress}",
         "stage_render": "🎞 Збираю відео… {progress}",
         "stage_upload": "📤 Надсилаю результат…",

@@ -123,7 +123,7 @@ async def transcribe(
         return result, info.language
 
     segments, detected = await _run_in_thread(work, on_progress)
-    return merge_sentences(_merge_duplicates(segments)), detected
+    return _merge_duplicates(segments), detected
 
 
 SENTENCE_END = (".", "!", "?", "…", "。", "！", "？", "»", '"')
@@ -143,6 +143,7 @@ def merge_sentences(segments: list[Segment]) -> list[Segment]:
         last = merged[-1] if merged else None
         if (
             last is not None
+            and last.speaker == seg.speaker  # never glue lines of two different people
             and not last.text.rstrip().endswith(SENTENCE_END)
             and seg.start - last.end <= MAX_PAUSE
             and seg.end - last.start <= MAX_SENTENCE_SECONDS
@@ -151,7 +152,7 @@ def merge_sentences(segments: list[Segment]) -> list[Segment]:
             last.text = f"{last.text.rstrip()} {seg.text.lstrip()}"
             last.end = seg.end
         else:
-            merged.append(Segment(seg.start, seg.end, seg.text))
+            merged.append(Segment(seg.start, seg.end, seg.text, speaker=seg.speaker))
     return merged
 
 

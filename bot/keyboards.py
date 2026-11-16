@@ -6,7 +6,7 @@ from . import languages
 from .i18n import UI_LANGUAGES, t
 
 AUTO = "auto"
-MODES = ("subtitles", "voice", "both")
+MODES = ("subtitles", "voice", "multi", "both", "multi_both")
 
 
 class UiLangCb(CallbackData, prefix="ui"):

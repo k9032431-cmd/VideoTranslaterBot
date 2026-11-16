@@ -6,6 +6,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from .config import PROVIDER_DEFAULTS
+from .pipeline import speakers
 from .pipeline.local import prefetch
 
 load_dotenv()
@@ -16,3 +17,4 @@ prefetch(
     os.getenv("TRANSLATE_MODEL") or nllb_default,
     Path(os.getenv("DATA_DIR", "data")).resolve() / "models",
 )
+speakers.prefetch(Path(os.getenv("DATA_DIR", "data")).resolve() / "models")

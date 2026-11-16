@@ -148,3 +148,33 @@ async def test_cancelling_stops_the_worker_thread():
 
 async def _noop(_):
     pass
+
+
+async def test_local_multi_voice_pipeline(tmp_path: Path, monkeypatch, fake_models):
+    from bot.pipeline import speakers
+    sample = FakeOpenAI(tmp_path).tts_sample
+    used: list[str] = []
+
+    class FakeCommunicate:
+        def __init__(self, text, voice):
+            used.append(voice)
+
+        async def save(self, path):
+            Path(path).write_bytes(sample.read_bytes())
+
+    async def fake_assign(audio, segments, models_dir, on_progress):
+        for i, seg in enumerate(segments):
+            seg.speaker = i % 2
+        return {0: speakers.Speaker(0, "male", 2.0), 1: speakers.Speaker(1, "female", 1.0)}
+
+    monkeypatch.setattr(dubbing.edge_tts, "Communicate", FakeCommunicate)
+    monkeypatch.setattr(speakers, "assign", fake_assign)
+    video = tmp_path / "in.mp4"
+    _make_video(video)
+    work = tmp_path / "work"
+    work.mkdir()
+
+    result = await run_job(None, _local_config(tmp_path), JobParams(video, work, "ru", "en", "multi"), _report)
+
+    assert used == ["en-US-AndrewMultilingualNeural", "en-US-EmmaMultilingualNeural"]
+    assert result.video and (work / "dub.wav").exists()
