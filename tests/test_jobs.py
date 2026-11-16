@@ -27,6 +27,8 @@ class FakeBot:
 
     def __getattr__(self, name):
         async def method(*args, **kwargs):
+            if name == "send_message" and len(args) > 1:
+                kwargs["text"] = args[1]
             if name in ("send_video", "send_document", "send_audio"):
                 media = args[1]
                 kwargs["size"] = Path(media.path).stat().st_size

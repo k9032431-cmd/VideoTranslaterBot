@@ -34,7 +34,7 @@ class FakeSession(BaseSession):
             return Message(
                 message_id=self._next_id, date=datetime.datetime.now(), chat=CHAT,
                 text=method.text, from_user=User(id=1, is_bot=True, first_name="bot"),
-            )
+            ).as_(bot)
         return True
 
     async def stream_content(self, *args, **kwargs):  # pragma: no cover
@@ -73,7 +73,7 @@ async def env(tmp_path: Path):
     config = Config(
         bot_token="42:TEST", provider="openai", ai_api_key="x", ai_base_url=None, telegram_api_url=None,
         telegram_api_local=True, transcribe_model="w", translate_model="m", translate_reasoning_effort="", tts_engine="openai", tts_model="t", tts_voice="v", tts_gender="male",
-        allowed_user_ids=frozenset(), admin_user_ids=frozenset(), max_video_minutes=180, max_concurrent_jobs=1, original_volume=0.2,
+        allowed_user_ids=frozenset(), admin_user_ids=frozenset(), max_video_minutes=180, max_source_mb=4000, public_url="", web_port=8080, link_ttl_hours=12, max_concurrent_jobs=1, original_volume=0.2,
         data_dir=tmp_path,
     )
     storage = UserStorage(config.db_path)
@@ -216,3 +216,41 @@ async def test_admin_update_button(env, tmp_path):
     await dp.feed_update(bot, _callback(keyboards.UpdateCb(action="confirm").pack()))
     assert session.texts()[-1] == t("ru", "update_started")
     assert (tmp_path / "update.request").read_text().strip() == str(CHAT.id)
+
+
+async def test_video_by_link(env, monkeypatch):
+    from bot import sources
+    dp, bot, session, jobs, _ = env
+    seen = []
+
+    async def fake_probe(url, cookies):
+        seen.append(url)
+        return sources.SourceInfo(url=url, title="Мой ролик: часть 1", duration=95, site="Youtube")
+
+    monkeypatch.setattr(sources, "probe", fake_probe)
+    await dp.feed_update(bot, _message(text="/start"))
+    await dp.feed_update(bot, _callback(keyboards.UiLangCb(lang="ru").pack()))
+    await dp.feed_update(bot, _message(text="вот https://youtu.be/abc123 переведи"))
+    assert seen == ["https://youtu.be/abc123"]
+    assert "Мой ролик: часть 1" in session.texts()[-2] and "(1:35)" in session.texts()[-2]
+    assert session.texts()[-1] == t("ru", "choose_source")
+
+    await dp.feed_update(bot, _callback(keyboards.SourceCb(lang="ru").pack()))
+    await dp.feed_update(bot, _callback(keyboards.TargetCb(lang="en").pack()))
+    await dp.feed_update(bot, _callback(keyboards.ModeCb(mode="subtitles").pack()))
+    await dp.feed_update(bot, _callback(keyboards.NavCb(action="start").pack()))
+    req = jobs.started[-1]
+    assert (req.url, req.file_id, req.file_name) == ("https://youtu.be/abc123", "", "Мой ролик_ часть 1.mp4")
+
+
+async def test_bad_link_is_explained(env, monkeypatch):
+    from bot import sources
+    dp, bot, session, jobs, _ = env
+
+    async def blocked(url, cookies):
+        raise sources.SourceError("link_bot_check")
+
+    monkeypatch.setattr(sources, "probe", blocked)
+    await dp.feed_update(bot, _message(text="https://youtube.com/watch?v=x"))
+    assert session.texts()[-1] == t("ru", "link_bot_check")
+    assert not jobs.started

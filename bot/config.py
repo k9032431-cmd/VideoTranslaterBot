@@ -59,6 +59,10 @@ class Config:
     allowed_user_ids: frozenset[int]
     admin_user_ids: frozenset[int]  # may update the bot from Telegram
     max_video_minutes: int
+    max_source_mb: int  # largest video downloaded by link
+    public_url: str  # base of download links, e.g. http://1.2.3.4:8080 ("" = off)
+    web_port: int
+    link_ttl_hours: float
     max_concurrent_jobs: int
     original_volume: float
 
@@ -69,6 +73,14 @@ class Config:
     def __post_init__(self) -> None:
         object.__setattr__(self, "work_dir", self.data_dir / "jobs")
         object.__setattr__(self, "db_path", self.data_dir / "bot.sqlite3")
+
+    @property
+    def downloads_dir(self) -> Path:
+        return self.data_dir / "downloads"
+
+    @property
+    def cookies_path(self) -> Path:
+        return self.data_dir / "youtube_cookies.txt"
 
     @property
     def models_dir(self) -> Path:
@@ -123,6 +135,10 @@ def load_config() -> Config:
         allowed_user_ids=_ids("ALLOWED_USER_IDS"),
         admin_user_ids=_ids("ADMIN_USER_IDS") or _ids("ALLOWED_USER_IDS"),
         max_video_minutes=_int("MAX_VIDEO_MINUTES", 180),
+        max_source_mb=_int("MAX_SOURCE_MB", 4000),
+        public_url=os.getenv("PUBLIC_URL", "").strip().rstrip("/"),
+        web_port=_int("WEB_PORT", 8080),
+        link_ttl_hours=_float("LINK_TTL_HOURS", 12),
         max_concurrent_jobs=_int("MAX_CONCURRENT_JOBS", 2),
         original_volume=_float("ORIGINAL_VOLUME", 0.15),
         data_dir=Path(os.getenv("DATA_DIR", "data")).resolve(),

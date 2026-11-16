@@ -1,17 +1,24 @@
 import html
 
 from aiogram import F, Router
-from aiogram.filters import Command, CommandStart
+import io
+
+from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
-from .. import keyboards
+from .. import keyboards, sources
 from ..config import Config
 from ..i18n import UI_LANGUAGES, all_variants, t
 from ..storage import UserStorage
 from ..updater import Updater
 
 router = Router(name="common")
+
+
+class CookiesFlow(StatesGroup):
+    waiting = State()
 
 
 @router.message(CommandStart())
@@ -87,3 +94,39 @@ async def on_update(
         return
     updater.start(callback.message.chat.id, lang)
     await callback.message.edit_text(t(lang, "update_started"))
+
+
+@router.message(Command("cookies"))
+async def cmd_cookies(
+    message: Message, command: CommandObject, state: FSMContext, lang: str, is_admin: bool, config: Config,
+) -> None:
+    """YouTube refuses servers without a signed-in account: the admin can hand over its cookies."""
+    if not is_admin:
+        return
+    if (command.args or "").strip().lower() in ("delete", "off", "удалить"):
+        config.cookies_path.unlink(missing_ok=True)
+        await message.answer(t(lang, "cookies_deleted"))
+        return
+    await state.set_state(CookiesFlow.waiting)
+    has = config.cookies_path.exists()
+    await message.answer(t(lang, "cookies_prompt", status=t(lang, "cookies_on" if has else "cookies_off")))
+
+
+@router.message(CookiesFlow.waiting, F.document)
+async def on_cookies_file(message: Message, state: FSMContext, lang: str, is_admin: bool, config: Config) -> None:
+    if not is_admin:
+        return
+    if (message.document.file_size or 0) > 1024 * 1024:
+        await message.answer(t(lang, "cookies_invalid"))
+        return
+    buffer = io.BytesIO()
+    await message.bot.download(message.document, destination=buffer)
+    text = buffer.getvalue().decode("utf-8", errors="replace")
+    if not sources.looks_like_cookies(text):
+        await message.answer(t(lang, "cookies_invalid"))
+        return
+    config.cookies_path.write_text(text, encoding="utf-8")
+    config.cookies_path.chmod(0o600)
+    await state.clear()
+    await message.delete()  # the file is a login to the account: don't keep it in the chat
+    await message.answer(t(lang, "cookies_saved"))

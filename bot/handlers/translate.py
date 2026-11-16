@@ -7,7 +7,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
-from .. import keyboards, languages
+from .. import keyboards, languages, sources
+from ..webserver import safe_filename
 from ..config import Config
 from ..i18n import all_variants, t
 from ..jobs import JobManager, JobRequest
@@ -93,6 +94,30 @@ async def on_video(message: Message, state: FSMContext, lang: str, config: Confi
 
     duration_text = f" ({duration // 60}:{duration % 60:02d})" if duration else ""
     await message.reply(t(lang, "video_received", name=html.escape(name), duration=duration_text))
+    await message.answer(t(lang, "choose_source"), reply_markup=keyboards.source_languages(lang))
+
+
+@router.message(F.text.func(lambda text: sources.find_url(text) is not None))
+async def on_link(message: Message, state: FSMContext, lang: str, config: Config, jobs: JobManager) -> None:
+    if jobs.is_busy(message.from_user.id):
+        await message.answer(t(lang, "busy"), reply_markup=keyboards.abort_job(lang))
+        return
+    url = sources.find_url(message.text)
+    checking = await message.reply(t(lang, "checking_link"))
+    try:
+        info = await sources.probe(url, config.cookies_path)
+    except sources.SourceError as exc:
+        await checking.edit_text(t(lang, exc.key, max_mb=config.max_source_mb))
+        return
+    if info.duration and info.duration // 60 >= config.max_video_minutes:
+        await checking.edit_text(t(lang, "too_long", minutes=info.duration // 60, max_min=config.max_video_minutes))
+        return
+
+    await state.clear()
+    await state.set_state(Flow.source)
+    await state.update_data(file_id="", url=info.url, file_name=safe_filename(info.title) + ".mp4")
+    duration_text = f" ({info.duration // 60}:{info.duration % 60:02d})" if info.duration else ""
+    await checking.edit_text(t(lang, "video_received", name=html.escape(info.title), duration=duration_text))
     await message.answer(t(lang, "choose_source"), reply_markup=keyboards.source_languages(lang))
 
 
@@ -199,8 +224,9 @@ async def on_start(callback: CallbackQuery, state: FSMContext, lang: str, jobs: 
         chat_id=callback.message.chat.id,
         status_message_id=message.message_id if isinstance(message, Message) else callback.message.message_id,
         lang=lang,
-        file_id=data["file_id"],
+        file_id=data.get("file_id", ""),
         file_name=data["file_name"],
+        url=data.get("url", ""),
         source=data["source"],
         target=data["target"],
         mode=data["mode"],

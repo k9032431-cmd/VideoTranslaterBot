@@ -14,12 +14,13 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import FSInputFile
 from openai import APIError, AsyncOpenAI, AuthenticationError, RateLimitError
 
-from . import keyboards, languages
+from . import keyboards, languages, sources
 from .config import Config
 from .i18n import t
 from .pipeline import media
 from .pipeline.job import JobParams, NoSpeechError, SameLanguageError, run_job
 from .pipeline.local import UnsupportedLanguageError
+from .webserver import FileServer
 
 log = logging.getLogger(__name__)
 
@@ -43,6 +44,7 @@ class JobRequest:
     source: str
     target: str
     mode: str
+    url: str = ""  # set instead of file_id for videos sent as a link
 
 
 class StatusMessage:
@@ -81,10 +83,13 @@ class StatusMessage:
 
 
 class JobManager:
-    def __init__(self, bot: Bot, config: Config, client: AsyncOpenAI | None) -> None:
+    def __init__(
+        self, bot: Bot, config: Config, client: AsyncOpenAI | None, files: FileServer | None = None,
+    ) -> None:
         self.bot = bot
         self.config = config
         self.client = client
+        self.files = files
         self.semaphore = asyncio.Semaphore(config.max_concurrent_jobs)
         self.running: dict[int, asyncio.Task] = {}
 
@@ -131,6 +136,9 @@ class JobManager:
         except AuthenticationError:
             log.error("API key was rejected")
             await status.final(t(lang, "error", error=t(lang, "bad_api_key")))
+        except sources.SourceError as exc:
+            log.warning("Link download failed for user %s: %s", req.user_id, exc)
+            await status.final(t(lang, exc.key, max_mb=self.config.max_source_mb))
         except UnsupportedLanguageError:
             await status.final(t(lang, "unsupported_language"))
         except TooLongError as exc:
@@ -145,11 +153,17 @@ class JobManager:
         lang = req.lang
         target = languages.get(req.target)
 
-        await status.stage("stage_download")
-        suffix = Path(req.file_name).suffix or ".mp4"
-        video = work_dir / f"input{suffix}"
-        file = await self.bot.get_file(req.file_id)
-        await self.bot.download_file(file.file_path, video, timeout=UPLOAD_TIMEOUT)
+        await status.stage("stage_download", 0.0 if req.url else None)
+        if req.url:
+            video = await sources.download(
+                req.url, work_dir, self.config.cookies_path, self.config.max_source_mb * 1024 * 1024,
+                on_progress=lambda p: status.stage("stage_download", p),
+            )
+        else:
+            suffix = Path(req.file_name).suffix or ".mp4"
+            video = work_dir / f"input{suffix}"
+            file = await self.bot.get_file(req.file_id)
+            await self.bot.download_file(file.file_path, video, timeout=UPLOAD_TIMEOUT)
 
         minutes = int(await media.duration(video) // 60)
         if minutes >= self.config.max_video_minutes:
@@ -181,12 +195,22 @@ class JobManager:
                     request_timeout=UPLOAD_TIMEOUT,
                 )
                 sent_video = True
+            elif self.files and self.files.enabled:
+                # Too big for Telegram: hand out a temporary link from our own server instead.
+                link = self.files.publish(result.video, f"{Path(req.file_name).stem}_{target.code}.mp4")
+                await self.bot.send_message(
+                    req.chat_id,
+                    t(lang, "download_link", url=html.escape(link), size_mb=size // (1024 * 1024),
+                      hours=f"{self.config.link_ttl_hours:g}"),
+                    disable_web_page_preview=True,
+                )
+                sent_video = True
             else:
                 await self.bot.send_message(
                     req.chat_id,
                     t(lang, "result_too_big", size_mb=size // (1024 * 1024), max_mb=limit // (1024 * 1024)),
                 )
-        if result.audio and result.audio.stat().st_size <= limit:
+        if result.audio and not sent_video and result.audio.stat().st_size <= limit:
             await self.bot.send_audio(
                 req.chat_id,
                 FSInputFile(result.audio, filename=f"{Path(req.file_name).stem}_{target.code}.m4a"),

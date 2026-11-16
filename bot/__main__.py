@@ -18,6 +18,7 @@ from .jobs import JobManager
 from .middlewares import UserContextMiddleware
 from .storage import UserStorage
 from .updater import Updater
+from .webserver import FileServer
 
 COMMANDS = {
     "ru": [("start", "Запустить бота"), ("translate", "Перевести видео"), ("menu", "Главное меню"),
@@ -53,7 +54,10 @@ async def main() -> None:
             api_key=config.ai_api_key, base_url=config.ai_base_url,
             max_retries=10 if config.provider == "free" else 5, timeout=600,
         )
-    jobs = JobManager(bot, config, client)
+    # Download links for results too big for Telegram; deleted after LINK_TTL_HOURS.
+    files = FileServer(config.downloads_dir, config.public_url, config.web_port, config.link_ttl_hours)
+    await files.start()
+    jobs = JobManager(bot, config, client, files)
 
     updater = Updater(bot, config.data_dir)
     updater.resume()  # report an update that restarted the bot
@@ -73,6 +77,7 @@ async def main() -> None:
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
+        await files.stop()
         await storage.close()
         if client:
             await client.close()

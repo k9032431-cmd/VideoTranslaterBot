@@ -210,6 +210,8 @@ install_python_deps() {
     fi
     "$APP_DIR/venv/bin/pip" install --quiet --upgrade pip || return 1
     "$APP_DIR/venv/bin/pip" install --quiet -r "$APP_DIR/requirements.txt" || return 1
+    # Сайты (особенно YouTube) часто меняются, а yt-dlp выходит почти каждую неделю — обновляем всегда.
+    "$APP_DIR/venv/bin/pip" install --quiet --upgrade "yt-dlp[default,deno]" || warn "Не удалось обновить yt-dlp."
     ok "Зависимости установлены"
 }
 
@@ -364,6 +366,7 @@ WorkingDirectory=$APP_DIR
 Environment=DATA_DIR=$APP_DIR/data
 Environment=PYTHONUNBUFFERED=1
 Environment=HOME=$APP_DIR/data
+Environment=PATH=$APP_DIR/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=HF_HUB_DISABLE_TELEMETRY=1
 ExecStart=$APP_DIR/venv/bin/python -m bot
 Restart=always
@@ -564,6 +567,28 @@ clear_openai_defaults() {
     done
 }
 
+# Ссылки на скачивание больших файлов: бот сам раздаёт их через свой веб-сервер.
+configure_links() {
+    local port url ip
+    port="$(env_get WEB_PORT)"
+    port="${port:-8080}"
+    url="$(env_get PUBLIC_URL)"
+    if [[ -z "$url" ]]; then
+        ip="$(curl -4 -fsS --max-time 10 https://api.ipify.org 2>/dev/null || true)"
+        if [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            url="http://$ip:$port"
+            env_set PUBLIC_URL "$url"
+            ok "Ссылки на скачивание: $url"
+        else
+            warn "Не удалось узнать IP сервера — ссылки на скачивание выключены. Впишите PUBLIC_URL в $(ENV_FILE)."
+            return 0
+        fi
+    fi
+    if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q "Status: active"; then
+        ufw allow "$port/tcp" >/dev/null && ok "Порт $port открыт в файрволе"
+    fi
+}
+
 write_version() {
     version_string >"$APP_DIR/data/version.txt"
     chown "$APP_USER:$APP_USER" "$APP_DIR/data/version.txt"
@@ -578,6 +603,7 @@ finish_setup() {
     create_user
     env_merge_new_keys
     configure
+    configure_links
     clear_openai_defaults
     prepare_dirs
     prefetch_models || return 1

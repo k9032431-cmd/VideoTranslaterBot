@@ -19,7 +19,7 @@ def test_every_ui_language_has_every_key():
 
 def test_ui_texts_format_without_errors():
     sample = dict(max_mb=1, max_min=1, size_mb=1, minutes=1, name="x", duration="", source="a",
-                  target="b", mode="m", progress="1%", error="e", version="v", log="l")
+                  target="b", mode="m", progress="1%", error="e", version="v", log="l", status="s", url="u", hours="12")
     for lang in i18n.TEXTS:
         for key in i18n.TEXTS[lang]:
             i18n.t(lang, key, **sample)

@@ -3,5 +3,7 @@ openai==3.31.0
 edge-tts==7.3.1
 faster-whisper==1.2.1
 sherpa-onnx==2.0.1
+# Unpinned on purpose: sites (YouTube above all) change often; the installer upgrades it on every update.
+yt-dlp[default,deno]>=2026.10.26
 aiosqlite==0.21.0
 python-dotenv==1.1.1

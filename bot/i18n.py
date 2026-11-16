@@ -30,7 +30,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "btn_auto": "🤖 Определить автоматически",
         "help": (
             "ℹ️ <b>Помощь</b>\n\n"
-            "• Отправьте видео как видео или как файл.\n"
+            "• Отправьте видео как видео или как файл — или ссылку на него (YouTube, VK, TikTok…).\n"
             "• Максимальный размер файла: <b>{max_mb} МБ</b>.\n"
             "• Максимальная длительность: <b>{max_min} мин</b>.\n\n"
             "<b>Форматы перевода</b>\n"
@@ -41,9 +41,9 @@ TEXTS: dict[str, dict[str, str]] = {
             "🎙📝 <b>Озвучка + субтитры</b> — и то и другое.\n\n"
             "Команды: /start, /menu, /language, /cancel"
         ),
-        "send_video": "📤 Отправьте видео, которое нужно перевести.",
+        "send_video": "📤 Отправьте видео или ссылку на него (YouTube, VK, TikTok, Rutube и другие сайты).",
         "not_a_video": "⚠️ Это не похоже на видео. Отправьте видеофайл.",
-        "too_big": "⚠️ Файл слишком большой ({size_mb} МБ). Максимум — {max_mb} МБ.",
+        "too_big": "⚠️ Файл слишком большой ({size_mb} МБ): Telegram даёт боту скачать максимум {max_mb} МБ.\n\n💡 Отправьте вместо файла ссылку на видео — так можно и большие файлы.",
         "too_long": "⚠️ Видео слишком длинное ({minutes} мин). Максимум — {max_min} мин.",
         "video_received": "✅ Видео получено: <b>{name}</b>{duration}",
         "choose_source": "🗣 На каком языке сейчас говорят в видео?",
@@ -87,6 +87,37 @@ TEXTS: dict[str, dict[str, str]] = {
         "no_speech": "🤷 В видео не найдено речи — переводить нечего.",
         "same_language": "⚠️ Речь в видео уже на языке {target}. Выберите другой язык перевода.",
         "error": "❌ Не получилось перевести видео: {error}\n\nПопробуйте ещё раз чуть позже.",
+        "checking_link": "🔎 Проверяю ссылку…",
+        "link_bot_check": (
+            "⚠️ YouTube не пускает сервер без входа в аккаунт («подтвердите, что вы не бот»).\n\n"
+            "Администратор может добавить файл cookies YouTube командой /cookies. Другие сайты работают и без этого."
+        ),
+        "link_unsupported": "⚠️ С этого сайта скачать видео не получается. Пришлите другую ссылку или сам файл.",
+        "link_private": "⚠️ Видео закрытое или с ограничением по возрасту — его нельзя скачать без входа в аккаунт.",
+        "link_unavailable": "⚠️ Видео не найдено или удалено. Проверьте ссылку.",
+        "link_failed": "⚠️ Не удалось скачать видео по ссылке. Попробуйте ещё раз или пришлите файл.",
+        "link_playlist": "⚠️ Это плейлист. Пришлите ссылку на одно видео.",
+        "link_live": "⚠️ Это прямая трансляция — её нельзя перевести, пока она идёт.",
+        "link_too_big": "⚠️ Видео по ссылке больше {max_mb} МБ — это слишком много.",
+        "download_link": (
+            "📦 Готовое видео весит {size_mb} МБ — Telegram не даёт ботам отправлять такие файлы.\n\n"
+            "⬇️ <a href=\"{url}\">Скачать видео</a>\n\n"
+            "⏳ Ссылка работает {hours} ч, потом файл автоматически удалится с сервера."
+        ),
+        "cookies_prompt": (
+            "🍪 <b>Cookies YouTube</b> ({status})\n\n"
+            "YouTube часто не отдаёт видео серверам без входа в аккаунт. Чтобы это обойти:\n"
+            "1. Войдите в YouTube в браузере на компьютере — лучше <b>запасным</b> аккаунтом Google.\n"
+            "2. Установите расширение «Get cookies.txt LOCALLY» (Chrome/Firefox).\n"
+            "3. Откройте youtube.com, нажмите расширение → <b>Export</b>.\n"
+            "4. Пришлите сюда полученный файл <code>cookies.txt</code>.\n\n"
+            "Удалить: <code>/cookies delete</code>"
+        ),
+        "cookies_on": "сейчас добавлены",
+        "cookies_off": "сейчас нет",
+        "cookies_saved": "✅ Cookies сохранены, файл удалён из чата. Пробуйте ссылку YouTube.",
+        "cookies_invalid": "⚠️ Это не похоже на cookies.txt с YouTube. Экспортируйте его на открытой странице youtube.com.",
+        "cookies_deleted": "🗑 Cookies удалены.",
         "error_generic": "внутренняя ошибка",
         "rate_limited": (
             "⏳ Закончился лимит API: дневной лимит бесплатного тарифа или баланс OpenAI.\n\n"
@@ -137,7 +168,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "btn_auto": "🤖 Detect automatically",
         "help": (
             "ℹ️ <b>Help</b>\n\n"
-            "• Send the video as a video or as a file.\n"
+            "• Send the video as a video or a file — or a link to it (YouTube, VK, TikTok…).\n"
             "• Maximum file size: <b>{max_mb} MB</b>.\n"
             "• Maximum length: <b>{max_min} min</b>.\n\n"
             "<b>Translation formats</b>\n"
@@ -148,9 +179,9 @@ TEXTS: dict[str, dict[str, str]] = {
             "🎙📝 <b>Voice-over + subtitles</b> — both.\n\n"
             "Commands: /start, /menu, /language, /cancel"
         ),
-        "send_video": "📤 Send the video you want to translate.",
+        "send_video": "📤 Send a video or a link to it (YouTube, VK, TikTok, Vimeo and other sites).",
         "not_a_video": "⚠️ That doesn't look like a video. Please send a video file.",
-        "too_big": "⚠️ The file is too large ({size_mb} MB). The limit is {max_mb} MB.",
+        "too_big": "⚠️ The file is too large ({size_mb} MB): Telegram lets bots download at most {max_mb} MB.\n\n💡 Send a link to the video instead — that works for big files too.",
         "too_long": "⚠️ The video is too long ({minutes} min). The limit is {max_min} min.",
         "video_received": "✅ Video received: <b>{name}</b>{duration}",
         "choose_source": "🗣 What language is spoken in the video?",
@@ -194,6 +225,37 @@ TEXTS: dict[str, dict[str, str]] = {
         "no_speech": "🤷 No speech was found in the video — nothing to translate.",
         "same_language": "⚠️ The video is already in {target}. Choose a different target language.",
         "error": "❌ Couldn't translate the video: {error}\n\nPlease try again a bit later.",
+        "checking_link": "🔎 Checking the link…",
+        "link_bot_check": (
+            "⚠️ YouTube refuses this server without a signed-in account (\"confirm you're not a bot\").\n\n"
+            "The admin can add YouTube cookies with /cookies. Other sites work without it."
+        ),
+        "link_unsupported": "⚠️ Videos can't be downloaded from this site. Send another link or the file itself.",
+        "link_private": "⚠️ The video is private or age-restricted — it can't be downloaded without signing in.",
+        "link_unavailable": "⚠️ The video was not found or has been removed. Check the link.",
+        "link_failed": "⚠️ Couldn't download the video from the link. Try again or send the file.",
+        "link_playlist": "⚠️ That's a playlist. Send a link to a single video.",
+        "link_live": "⚠️ That's a live stream — it can't be translated while it's live.",
+        "link_too_big": "⚠️ The linked video is larger than {max_mb} MB — that's too much.",
+        "download_link": (
+            "📦 The finished video is {size_mb} MB — Telegram doesn't let bots send files that big.\n\n"
+            "⬇️ <a href=\"{url}\">Download the video</a>\n\n"
+            "⏳ The link works for {hours} h, then the file is deleted from the server automatically."
+        ),
+        "cookies_prompt": (
+            "🍪 <b>YouTube cookies</b> ({status})\n\n"
+            "YouTube often refuses to serve videos to servers without a signed-in account. To get around it:\n"
+            "1. Sign in to YouTube in a desktop browser — preferably with a <b>spare</b> Google account.\n"
+            "2. Install the \"Get cookies.txt LOCALLY\" extension (Chrome/Firefox).\n"
+            "3. Open youtube.com, click the extension → <b>Export</b>.\n"
+            "4. Send the resulting <code>cookies.txt</code> file here.\n\n"
+            "Remove: <code>/cookies delete</code>"
+        ),
+        "cookies_on": "currently added",
+        "cookies_off": "none yet",
+        "cookies_saved": "✅ Cookies saved and the file removed from the chat. Try a YouTube link.",
+        "cookies_invalid": "⚠️ That doesn't look like a YouTube cookies.txt. Export it on an open youtube.com page.",
+        "cookies_deleted": "🗑 Cookies removed.",
         "error_generic": "internal error",
         "rate_limited": (
             "⏳ The API limit is used up: the free tier's daily limit or the OpenAI balance.\n\n"
@@ -244,7 +306,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "btn_auto": "🤖 Визначити автоматично",
         "help": (
             "ℹ️ <b>Допомога</b>\n\n"
-            "• Надішліть відео як відео або як файл.\n"
+            "• Надішліть відео як відео або як файл — або посилання на нього (YouTube, TikTok…).\n"
             "• Максимальний розмір файлу: <b>{max_mb} МБ</b>.\n"
             "• Максимальна тривалість: <b>{max_min} хв</b>.\n\n"
             "<b>Формати перекладу</b>\n"
@@ -255,9 +317,9 @@ TEXTS: dict[str, dict[str, str]] = {
             "🎙📝 <b>Озвучення + субтитри</b> — і те, і інше.\n\n"
             "Команди: /start, /menu, /language, /cancel"
         ),
-        "send_video": "📤 Надішліть відео, яке потрібно перекласти.",
+        "send_video": "📤 Надішліть відео або посилання на нього (YouTube, TikTok, Vimeo та інші сайти).",
         "not_a_video": "⚠️ Це не схоже на відео. Надішліть відеофайл.",
-        "too_big": "⚠️ Файл завеликий ({size_mb} МБ). Максимум — {max_mb} МБ.",
+        "too_big": "⚠️ Файл завеликий ({size_mb} МБ): Telegram дозволяє боту завантажити максимум {max_mb} МБ.\n\n💡 Надішліть замість файлу посилання на відео — так можна й великі файли.",
         "too_long": "⚠️ Відео задовге ({minutes} хв). Максимум — {max_min} хв.",
         "video_received": "✅ Відео отримано: <b>{name}</b>{duration}",
         "choose_source": "🗣 Якою мовою зараз говорять у відео?",
@@ -301,6 +363,37 @@ TEXTS: dict[str, dict[str, str]] = {
         "no_speech": "🤷 У відео не знайдено мовлення — перекладати нічого.",
         "same_language": "⚠️ Мовлення у відео вже мовою {target}. Оберіть іншу мову перекладу.",
         "error": "❌ Не вдалося перекласти відео: {error}\n\nСпробуйте ще раз трохи пізніше.",
+        "checking_link": "🔎 Перевіряю посилання…",
+        "link_bot_check": (
+            "⚠️ YouTube не пускає сервер без входу в акаунт («підтвердіть, що ви не бот»).\n\n"
+            "Адміністратор може додати cookies YouTube командою /cookies. Інші сайти працюють і без цього."
+        ),
+        "link_unsupported": "⚠️ З цього сайту завантажити відео не вдається. Надішліть інше посилання або сам файл.",
+        "link_private": "⚠️ Відео закрите або з віковим обмеженням — його не завантажити без входу в акаунт.",
+        "link_unavailable": "⚠️ Відео не знайдено або видалено. Перевірте посилання.",
+        "link_failed": "⚠️ Не вдалося завантажити відео за посиланням. Спробуйте ще раз або надішліть файл.",
+        "link_playlist": "⚠️ Це плейлист. Надішліть посилання на одне відео.",
+        "link_live": "⚠️ Це пряма трансляція — її не можна перекласти, поки вона триває.",
+        "link_too_big": "⚠️ Відео за посиланням більше {max_mb} МБ — це забагато.",
+        "download_link": (
+            "📦 Готове відео важить {size_mb} МБ — Telegram не дозволяє ботам надсилати такі файли.\n\n"
+            "⬇️ <a href=\"{url}\">Завантажити відео</a>\n\n"
+            "⏳ Посилання працює {hours} год, потім файл автоматично видалиться з сервера."
+        ),
+        "cookies_prompt": (
+            "🍪 <b>Cookies YouTube</b> ({status})\n\n"
+            "YouTube часто не віддає відео серверам без входу в акаунт. Щоб це обійти:\n"
+            "1. Увійдіть у YouTube у браузері на комп'ютері — краще <b>запасним</b> акаунтом Google.\n"
+            "2. Встановіть розширення «Get cookies.txt LOCALLY» (Chrome/Firefox).\n"
+            "3. Відкрийте youtube.com, натисніть розширення → <b>Export</b>.\n"
+            "4. Надішліть сюди отриманий файл <code>cookies.txt</code>.\n\n"
+            "Видалити: <code>/cookies delete</code>"
+        ),
+        "cookies_on": "зараз додані",
+        "cookies_off": "зараз немає",
+        "cookies_saved": "✅ Cookies збережено, файл видалено з чату. Пробуйте посилання YouTube.",
+        "cookies_invalid": "⚠️ Це не схоже на cookies.txt з YouTube. Експортуйте його на відкритій сторінці youtube.com.",
+        "cookies_deleted": "🗑 Cookies видалено.",
         "error_generic": "внутрішня помилка",
         "rate_limited": (
             "⏳ Закінчився ліміт API: денний ліміт безкоштовного тарифу або баланс OpenAI.\n\n"
