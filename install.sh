@@ -607,6 +607,14 @@ write_version() {
     chown "$APP_USER:$APP_USER" "$APP_DIR/data/version.txt"
 }
 
+# Раньше по умолчанию стояло ограничение 180 минут; теперь по умолчанию длительность не ограничена.
+clear_old_limits() {
+    if [[ "$(env_get MAX_VIDEO_MINUTES)" == 180 ]]; then
+        env_set MAX_VIDEO_MINUTES 0
+        ok "Ограничение длительности видео снято"
+    fi
+}
+
 # Общий хвост установки и обновления. Настройки спрашиваются, только если чего-то не хватает.
 finish_setup() {
     # Старые установки работали только через OpenAI — не переключаем их в бесплатный режим.
@@ -618,6 +626,7 @@ finish_setup() {
     configure
     configure_links
     clear_openai_defaults
+    clear_old_limits
     prepare_dirs
     prefetch_models || return 1
     write_version

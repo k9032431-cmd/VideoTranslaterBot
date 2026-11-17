@@ -165,9 +165,9 @@ class JobManager:
             file = await self.bot.get_file(req.file_id)
             await self.bot.download_file(file.file_path, video, timeout=UPLOAD_TIMEOUT)
 
-        minutes = int(await media.duration(video) // 60)
-        if minutes >= self.config.max_video_minutes:
-            raise TooLongError(minutes)
+        seconds = await media.duration(video)
+        if self.config.too_long(seconds):
+            raise TooLongError(int(seconds // 60))
 
         result = await run_job(
             self.client, self.config,

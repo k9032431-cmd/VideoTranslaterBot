@@ -58,7 +58,7 @@ class Config:
 
     allowed_user_ids: frozenset[int]
     admin_user_ids: frozenset[int]  # may update the bot from Telegram
-    max_video_minutes: int
+    max_video_minutes: int  # 0 = no limit
     max_source_mb: int  # largest video downloaded by link
     public_url: str  # base of download links, e.g. http://1.2.3.4:8080 ("" = off)
     web_port: int
@@ -73,6 +73,9 @@ class Config:
     def __post_init__(self) -> None:
         object.__setattr__(self, "work_dir", self.data_dir / "jobs")
         object.__setattr__(self, "db_path", self.data_dir / "bot.sqlite3")
+
+    def too_long(self, seconds: float | None) -> bool:
+        return bool(self.max_video_minutes and seconds and seconds // 60 >= self.max_video_minutes)
 
     @property
     def downloads_dir(self) -> Path:
@@ -134,7 +137,7 @@ def load_config() -> Config:
         tts_gender="female" if _str("TTS_GENDER", "male").lower() == "female" else "male",
         allowed_user_ids=_ids("ALLOWED_USER_IDS"),
         admin_user_ids=_ids("ADMIN_USER_IDS") or _ids("ALLOWED_USER_IDS"),
-        max_video_minutes=_int("MAX_VIDEO_MINUTES", 180),
+        max_video_minutes=_int("MAX_VIDEO_MINUTES", 0),
         max_source_mb=_int("MAX_SOURCE_MB", 4000),
         public_url=os.getenv("PUBLIC_URL", "").strip().rstrip("/"),
         web_port=_int("WEB_PORT", 8080),

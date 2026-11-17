@@ -84,7 +84,7 @@ async def on_video(message: Message, state: FSMContext, lang: str, config: Confi
             lang, "too_big", size_mb=round(size / 1024 / 1024, 1), max_mb=max_bytes // (1024 * 1024)
         ))
         return
-    if duration and duration // 60 >= config.max_video_minutes:
+    if config.too_long(duration):
         await message.answer(t(lang, "too_long", minutes=duration // 60, max_min=config.max_video_minutes))
         return
 
@@ -109,7 +109,7 @@ async def on_link(message: Message, state: FSMContext, lang: str, config: Config
     except sources.SourceError as exc:
         await checking.edit_text(t(lang, exc.key, max_mb=config.max_source_mb))
         return
-    if info.duration and info.duration // 60 >= config.max_video_minutes:
+    if config.too_long(info.duration):
         await checking.edit_text(t(lang, "too_long", minutes=info.duration // 60, max_min=config.max_video_minutes))
         return
 

@@ -252,3 +252,13 @@ def test_merge_sentences_respects_length_limit():
 def test_every_language_has_nllb_code():
     for lang in languages.LANGUAGES:
         assert re.fullmatch(r"[a-z]{3}_[A-Z][a-z]{3}", lang.nllb), lang.code
+
+
+def test_video_length_limit(tmp_path):
+    from dataclasses import replace
+
+    from tests.test_pipeline_e2e import _config
+    unlimited = replace(_config(tmp_path), max_video_minutes=0)
+    assert not unlimited.too_long(10 * 3600)  # 0 = no limit, even for a 10-hour video
+    limited = replace(_config(tmp_path), max_video_minutes=180)
+    assert limited.too_long(180 * 60) and not limited.too_long(179 * 60) and not limited.too_long(None)

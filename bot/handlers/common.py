@@ -62,7 +62,7 @@ async def cmd_help(message: Message, lang: str, config: Config) -> None:
     await message.answer(t(
         lang, "help",
         max_mb=config.max_download_bytes // (1024 * 1024),
-        max_min=config.max_video_minutes,
+        max_min=config.max_video_minutes or "∞",
     ))
 
 
