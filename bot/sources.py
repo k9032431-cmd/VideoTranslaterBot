@@ -12,12 +12,15 @@ log = logging.getLogger(__name__)
 
 URL_RE = re.compile(r"https?://[^\s<>\"']+", re.IGNORECASE)
 PROBE_TIMEOUT = 60
-# Translation doesn't need more; higher resolutions only make burning subtitles slower.
-MAX_HEIGHT = 720
-FORMAT = (
-    f"bv*[height<={MAX_HEIGHT}][ext=mp4]+ba[ext=m4a]/bv*[height<={MAX_HEIGHT}]+ba"
-    f"/b[height<={MAX_HEIGHT}]/bv*+ba/b"
-)
+
+
+def format_options(max_height: int | None) -> dict:
+    """Best video+audio, preferring the largest picture whose short side ≤ max_height ("res" in
+    yt-dlp is the smallest dimension, so vertical videos are handled too) and mp4 where possible."""
+    sort = ["ext:mp4:m4a"]
+    if max_height:
+        sort.insert(0, f"res:{max_height}")
+    return {"format": "bv*+ba/b", "format_sort": sort}
 
 
 class SourceError(Exception):
@@ -104,6 +107,7 @@ async def download(
     cookies: Path | None,
     max_bytes: int,
     on_progress: Callable[[float], Awaitable[None]],
+    max_height: int | None = None,
 ) -> Path:
     """Download into work_dir/source.<ext>; return the file."""
     import yt_dlp
@@ -120,8 +124,7 @@ async def download(
                 asyncio.run_coroutine_threadsafe(on_progress(min(status["downloaded_bytes"] / total, 1.0)), loop)
 
     def work() -> Path:
-        opts = _options(cookies) | {
-            "format": FORMAT,
+        opts = _options(cookies) | format_options(max_height) | {
             "merge_output_format": "mp4",
             "outtmpl": str(work_dir / "source.%(ext)s"),
             "max_filesize": max_bytes,

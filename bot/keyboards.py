@@ -7,6 +7,7 @@ from .i18n import UI_LANGUAGES, t
 
 AUTO = "auto"
 MODES = ("subtitles", "voice", "multi", "both", "multi_both")
+QUALITIES = ("360", "480", "720", "1080", "orig")
 
 
 class UiLangCb(CallbackData, prefix="ui"):
@@ -23,6 +24,10 @@ class TargetCb(CallbackData, prefix="dst"):
 
 class ModeCb(CallbackData, prefix="mode"):
     mode: str
+
+
+class QualityCb(CallbackData, prefix="q"):
+    quality: str
 
 
 class UpdateCb(CallbackData, prefix="upd"):
@@ -95,6 +100,15 @@ def modes(lang: str) -> InlineKeyboardMarkup:
     for mode in MODES:
         kb.button(text=t(lang, f"mode_{mode}"), callback_data=ModeCb(mode=mode))
     kb.adjust(1)
+    _nav_row(kb, lang, back=True)
+    return kb.as_markup()
+
+
+def qualities(lang: str) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    for quality in QUALITIES:
+        kb.button(text=t(lang, f"quality_{quality}"), callback_data=QualityCb(quality=quality))
+    kb.adjust(2, 2, 1)
     _nav_row(kb, lang, back=True)
     return kb.as_markup()
 

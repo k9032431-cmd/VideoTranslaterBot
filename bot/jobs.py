@@ -45,6 +45,7 @@ class JobRequest:
     target: str
     mode: str
     url: str = ""  # set instead of file_id for videos sent as a link
+    quality: str = "720"  # 360 | 480 | 720 | 1080 | orig
 
 
 class StatusMessage:
@@ -153,11 +154,13 @@ class JobManager:
         lang = req.lang
         target = languages.get(req.target)
 
+        max_height = None if req.quality == "orig" else int(req.quality)
         await status.stage("stage_download", 0.0 if req.url else None)
         if req.url:
             video = await sources.download(
                 req.url, work_dir, self.config.cookies_path, self.config.max_source_mb * 1024 * 1024,
                 on_progress=lambda p: status.stage("stage_download", p),
+                max_height=max_height,
             )
         else:
             suffix = Path(req.file_name).suffix or ".mp4"
@@ -171,7 +174,8 @@ class JobManager:
 
         result = await run_job(
             self.client, self.config,
-            JobParams(video=video, work_dir=work_dir, source=req.source, target=req.target, mode=req.mode),
+            JobParams(video=video, work_dir=work_dir, source=req.source, target=req.target, mode=req.mode,
+                      max_height=max_height),
             status.stage,
         )
 

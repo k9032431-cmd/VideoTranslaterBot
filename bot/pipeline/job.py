@@ -32,7 +32,8 @@ class JobParams:
     work_dir: Path
     source: str  # language code or "auto"
     target: str
-    mode: str  # subtitles | voice | both
+    mode: str  # subtitles | voice | both | multi | multi_both
+    max_height: int | None = None  # output quality (short side), None = as the original
 
 
 @dataclass
@@ -137,6 +138,7 @@ async def run_job(client: AsyncOpenAI | None, config: Config, params: JobParams,
             srt=srt if burn_subs else None,
             dub=dub_track,
             original_volume=config.original_volume,
+            max_height=params.max_height,
         )
 
     audio: Path | None = None

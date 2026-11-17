@@ -151,13 +151,20 @@ async def test_full_dialog(env):
     assert session.texts()[-1] == t("ru", "choose_mode")
 
     await dp.feed_update(bot, _callback(keyboards.ModeCb(mode="both").pack()))
+    assert session.texts()[-1] == t("ru", "choose_quality")
+    await dp.feed_update(bot, _callback(keyboards.NavCb(action="back").pack()))  # back to formats and again
+    assert session.texts()[-1] == t("ru", "choose_mode")
+    await dp.feed_update(bot, _callback(keyboards.ModeCb(mode="both").pack()))
+    await dp.feed_update(bot, _callback(keyboards.QualityCb(quality="480").pack()))
     summary = session.texts()[-1]
     assert "film.mp4" in summary and "Русский" in summary and "English" in summary
+    assert t("ru", "quality_480") in summary
 
     await dp.feed_update(bot, _callback(keyboards.NavCb(action="start").pack()))
     assert len(jobs.started) == 1
     req = jobs.started[0]
-    assert (req.file_id, req.source, req.target, req.mode, req.lang) == ("FILE", "ru", "en", "both", "ru")
+    assert (req.file_id, req.source, req.target, req.mode, req.lang, req.quality) == (
+        "FILE", "ru", "en", "both", "ru", "480")
 
     # pressing an old button after the job started is handled gracefully
     await dp.feed_update(bot, _callback(keyboards.ModeCb(mode="voice").pack()))
@@ -238,9 +245,11 @@ async def test_video_by_link(env, monkeypatch):
     await dp.feed_update(bot, _callback(keyboards.SourceCb(lang="ru").pack()))
     await dp.feed_update(bot, _callback(keyboards.TargetCb(lang="en").pack()))
     await dp.feed_update(bot, _callback(keyboards.ModeCb(mode="subtitles").pack()))
+    await dp.feed_update(bot, _callback(keyboards.QualityCb(quality="orig").pack()))
     await dp.feed_update(bot, _callback(keyboards.NavCb(action="start").pack()))
     req = jobs.started[-1]
-    assert (req.url, req.file_id, req.file_name) == ("https://youtu.be/abc123", "", "Мой ролик_ часть 1.mp4")
+    assert (req.url, req.file_id, req.file_name, req.quality) == (
+        "https://youtu.be/abc123", "", "Мой ролик_ часть 1.mp4", "orig")
 
 
 async def test_bad_link_is_explained(env, monkeypatch):

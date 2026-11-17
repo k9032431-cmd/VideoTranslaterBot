@@ -23,6 +23,7 @@ class Flow(StatesGroup):
     source = State()
     target = State()
     mode = State()
+    quality = State()
     confirm = State()
 
 
@@ -147,6 +148,11 @@ async def _show_mode(callback: CallbackQuery, state: FSMContext, lang: str) -> N
     await callback.message.edit_text(t(lang, "choose_mode"), reply_markup=keyboards.modes(lang))
 
 
+async def _show_quality(callback: CallbackQuery, state: FSMContext, lang: str) -> None:
+    await state.set_state(Flow.quality)
+    await callback.message.edit_text(t(lang, "choose_quality"), reply_markup=keyboards.qualities(lang))
+
+
 async def _show_confirm(callback: CallbackQuery, state: FSMContext, lang: str) -> None:
     data = await state.get_data()
     await state.set_state(Flow.confirm)
@@ -157,6 +163,7 @@ async def _show_confirm(callback: CallbackQuery, state: FSMContext, lang: str) -
             source=_source_label(lang, data["source"]),
             target=languages.get(data["target"]).label,
             mode=t(lang, f"mode_{data['mode']}"),
+            quality=t(lang, f"quality_{data['quality']}"),
         ),
         reply_markup=keyboards.confirm(lang),
     )
@@ -187,10 +194,21 @@ async def on_target(callback: CallbackQuery, callback_data: keyboards.TargetCb, 
 async def on_mode(callback: CallbackQuery, callback_data: keyboards.ModeCb, state: FSMContext, lang: str) -> None:
     await state.update_data(mode=callback_data.mode)
     await callback.answer()
+    await _show_quality(callback, state, lang)
+
+
+@router.callback_query(Flow.quality, keyboards.QualityCb.filter(F.quality.in_(keyboards.QUALITIES)))
+async def on_quality(
+    callback: CallbackQuery, callback_data: keyboards.QualityCb, state: FSMContext, lang: str,
+) -> None:
+    await state.update_data(quality=callback_data.quality)
+    await callback.answer()
     await _show_confirm(callback, state, lang)
 
 
-@router.callback_query(keyboards.NavCb.filter(F.action == "back"), StateFilter(Flow.target, Flow.mode, Flow.confirm))
+@router.callback_query(
+    keyboards.NavCb.filter(F.action == "back"), StateFilter(Flow.target, Flow.mode, Flow.quality, Flow.confirm),
+)
 async def on_back(callback: CallbackQuery, state: FSMContext, lang: str) -> None:
     current = await state.get_state()
     await callback.answer()
@@ -198,8 +216,10 @@ async def on_back(callback: CallbackQuery, state: FSMContext, lang: str) -> None
         await _show_source(callback, state, lang)
     elif current == Flow.mode.state:
         await _show_target(callback, state, lang)
-    else:
+    elif current == Flow.quality.state:
         await _show_mode(callback, state, lang)
+    else:
+        await _show_quality(callback, state, lang)
 
 
 @router.callback_query(keyboards.NavCb.filter(F.action == "cancel"))
@@ -227,6 +247,7 @@ async def on_start(callback: CallbackQuery, state: FSMContext, lang: str, jobs: 
         file_id=data.get("file_id", ""),
         file_name=data["file_name"],
         url=data.get("url", ""),
+        quality=data.get("quality", "720"),
         source=data["source"],
         target=data["target"],
         mode=data["mode"],

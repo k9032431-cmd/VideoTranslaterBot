@@ -59,8 +59,18 @@ TEXTS: dict[str, dict[str, str]] = {
             "🎬 Видео: <b>{name}</b>\n"
             "🗣 Язык видео: <b>{source}</b>\n"
             "🌍 Перевести на: <b>{target}</b>\n"
-            "🎞 Формат: <b>{mode}</b>"
+            "🎞 Формат: <b>{mode}</b>\n"
+            "📺 Качество: <b>{quality}</b>"
         ),
+        "choose_quality": (
+            "📺 В каком качестве сделать видео?\n\n"
+            "Чем ниже качество, тем меньше файл и быстрее обработка. Больше, чем в оригинале, не будет."
+        ),
+        "quality_360": "360p — самый лёгкий",
+        "quality_480": "480p",
+        "quality_720": "720p HD ⭐",
+        "quality_1080": "1080p Full HD",
+        "quality_orig": "🎬 Как в оригинале",
         "auto_detect": "автоопределение",
         "cancelled": "❌ Отменено.",
         "nothing_to_cancel": "Сейчас нечего отменять.",
@@ -202,8 +212,18 @@ TEXTS: dict[str, dict[str, str]] = {
             "🎬 Video: <b>{name}</b>\n"
             "🗣 Video language: <b>{source}</b>\n"
             "🌍 Translate into: <b>{target}</b>\n"
-            "🎞 Format: <b>{mode}</b>"
+            "🎞 Format: <b>{mode}</b>\n"
+            "📺 Quality: <b>{quality}</b>"
         ),
+        "choose_quality": (
+            "📺 What quality should the video be?\n\n"
+            "Lower quality means a smaller file and faster processing. It never gets better than the original."
+        ),
+        "quality_360": "360p — smallest",
+        "quality_480": "480p",
+        "quality_720": "720p HD ⭐",
+        "quality_1080": "1080p Full HD",
+        "quality_orig": "🎬 As in the original",
         "auto_detect": "auto-detect",
         "cancelled": "❌ Cancelled.",
         "nothing_to_cancel": "There is nothing to cancel.",
@@ -345,8 +365,18 @@ TEXTS: dict[str, dict[str, str]] = {
             "🎬 Відео: <b>{name}</b>\n"
             "🗣 Мова відео: <b>{source}</b>\n"
             "🌍 Перекласти на: <b>{target}</b>\n"
-            "🎞 Формат: <b>{mode}</b>"
+            "🎞 Формат: <b>{mode}</b>\n"
+            "📺 Якість: <b>{quality}</b>"
         ),
+        "choose_quality": (
+            "📺 У якій якості зробити відео?\n\n"
+            "Чим нижча якість, тим менший файл і швидша обробка. Кращою за оригінал не буде."
+        ),
+        "quality_360": "360p — найлегше",
+        "quality_480": "480p",
+        "quality_720": "720p HD ⭐",
+        "quality_1080": "1080p Full HD",
+        "quality_orig": "🎬 Як в оригіналі",
         "auto_detect": "автовизначення",
         "cancelled": "❌ Скасовано.",
         "nothing_to_cancel": "Зараз нічого скасовувати.",
