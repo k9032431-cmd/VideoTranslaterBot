@@ -8,6 +8,8 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from . import gdrive
+
 log = logging.getLogger(__name__)
 
 URL_RE = re.compile(r"https?://[^\s<>\"']+", re.IGNORECASE)
@@ -75,8 +77,45 @@ def _classify(error: Exception) -> SourceError:
     return SourceError("link_failed", text)
 
 
-async def probe(url: str, cookies: Path | None) -> SourceInfo:
+async def _media_duration(url: str) -> int | None:
+    """Duration of a remote file via ffprobe (reads only what it needs), None if it can't tell."""
+    proc = await asyncio.create_subprocess_exec(
+        "ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", url,
+        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+    )
+    try:
+        out, _ = await asyncio.wait_for(proc.communicate(), 45)
+        return int(float(out.decode().strip()))
+    except (asyncio.TimeoutError, ValueError):
+        if proc.returncode is None:
+            proc.kill()
+            await proc.wait()
+        return None
+
+
+async def _probe_drive(url: str, max_bytes: int | None) -> SourceInfo:
+    if gdrive.is_folder(url):
+        raise SourceError("link_drive_folder")
+    fid = gdrive.file_id(url)
+    if not fid:
+        raise SourceError("link_drive_private")
+    try:
+        name, size = await gdrive.probe(fid)
+    except ValueError as exc:
+        raise SourceError("link_drive_private" if str(exc) == "private" else "link_not_video") from exc
+    except Exception as exc:
+        raise SourceError("link_failed", str(exc)) from exc
+    if max_bytes and size > max_bytes:
+        raise SourceError("link_too_big")
+    duration = await _media_duration(gdrive.DOWNLOAD_URL.format(id=fid))
+    return SourceInfo(url=url, title=Path(name).stem[:120] or "video", duration=duration, site="GoogleDrive")
+
+
+async def probe(url: str, cookies: Path | None, max_bytes: int | None = None) -> SourceInfo:
     import yt_dlp
+
+    if gdrive.is_drive(url):
+        return await _probe_drive(url, max_bytes)
 
     def work() -> dict:
         with yt_dlp.YoutubeDL(_options(cookies)) as ydl:
@@ -111,6 +150,21 @@ async def download(
 ) -> Path:
     """Download into work_dir/source.<ext>; return the file."""
     import yt_dlp
+
+    if gdrive.is_drive(url):
+        fid = gdrive.file_id(url) or ""
+        try:
+            name, size = await gdrive.probe(fid)
+            if size > max_bytes:
+                raise SourceError("link_too_big")
+            dest = work_dir / ("source" + (Path(name).suffix.lower() or ".mp4"))
+            return await gdrive.download(fid, dest, size, on_progress)
+        except SourceError:
+            raise
+        except ValueError as exc:
+            raise SourceError("link_drive_private" if str(exc) == "private" else "link_not_video") from exc
+        except Exception as exc:
+            raise SourceError("link_failed", str(exc)) from exc
 
     loop = asyncio.get_running_loop()
     stop = threading.Event()

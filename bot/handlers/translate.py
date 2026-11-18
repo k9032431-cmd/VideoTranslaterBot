@@ -106,7 +106,7 @@ async def on_link(message: Message, state: FSMContext, lang: str, config: Config
     url = sources.find_url(message.text)
     checking = await message.reply(t(lang, "checking_link"))
     try:
-        info = await sources.probe(url, config.cookies_path)
+        info = await sources.probe(url, config.cookies_path, config.max_source_mb * 1024 * 1024)
     except sources.SourceError as exc:
         await checking.edit_text(t(lang, exc.key, max_mb=config.max_source_mb))
         return

@@ -230,7 +230,7 @@ async def test_video_by_link(env, monkeypatch):
     dp, bot, session, jobs, _ = env
     seen = []
 
-    async def fake_probe(url, cookies):
+    async def fake_probe(url, cookies, max_bytes=None):
         seen.append(url)
         return sources.SourceInfo(url=url, title="Мой ролик: часть 1", duration=95, site="Youtube")
 
@@ -256,7 +256,7 @@ async def test_bad_link_is_explained(env, monkeypatch):
     from bot import sources
     dp, bot, session, jobs, _ = env
 
-    async def blocked(url, cookies):
+    async def blocked(url, cookies, max_bytes=None):
         raise sources.SourceError("link_bot_check")
 
     monkeypatch.setattr(sources, "probe", blocked)

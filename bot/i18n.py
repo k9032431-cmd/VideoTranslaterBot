@@ -41,7 +41,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "🎙📝 <b>Озвучка + субтитры</b> — и то и другое.\n\n"
             "Команды: /start, /menu, /language, /cancel"
         ),
-        "send_video": "📤 Отправьте видео или ссылку на него (YouTube, VK, TikTok, Rutube и другие сайты).",
+        "send_video": "📤 Отправьте видео или ссылку на него: YouTube, VK, TikTok, Rutube, Google Drive и другие сайты.",
         "not_a_video": "⚠️ Это не похоже на видео. Отправьте видеофайл.",
         "too_big": "⚠️ Файл слишком большой ({size_mb} МБ): Telegram даёт боту скачать максимум {max_mb} МБ.\n\n💡 Отправьте вместо файла ссылку на видео — так можно и большие файлы.",
         "too_long": "⚠️ Видео слишком длинное ({minutes} мин). Максимум — {max_min} мин.",
@@ -106,6 +106,13 @@ TEXTS: dict[str, dict[str, str]] = {
         "link_private": "⚠️ Видео закрытое или с ограничением по возрасту — его нельзя скачать без входа в аккаунт.",
         "link_unavailable": "⚠️ Видео не найдено или удалено. Проверьте ссылку.",
         "link_failed": "⚠️ Не удалось скачать видео по ссылке. Попробуйте ещё раз или пришлите файл.",
+        "link_drive_private": (
+            "⚠️ Google Drive не отдаёт файл. Откройте доступ: в Google Drive нажмите на файл → "
+            "<b>Поделиться</b> → «Общий доступ» → <b>Все, у кого есть ссылка</b>, и пришлите ссылку ещё раз.\n\n"
+            "Если доступ уже открыт, у файла мог закончиться дневной лимит скачиваний Google — попробуйте позже."
+        ),
+        "link_drive_folder": "⚠️ Это ссылка на папку. Пришлите ссылку на сам видеофайл (нажмите на файл → Поделиться → Копировать ссылку).",
+        "link_not_video": "⚠️ По ссылке не видеофайл. Пришлите ссылку на видео.",
         "link_playlist": "⚠️ Это плейлист. Пришлите ссылку на одно видео.",
         "link_live": "⚠️ Это прямая трансляция — её нельзя перевести, пока она идёт.",
         "link_too_big": "⚠️ Видео по ссылке больше {max_mb} МБ — это слишком много.",
@@ -194,7 +201,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "🎙📝 <b>Voice-over + subtitles</b> — both.\n\n"
             "Commands: /start, /menu, /language, /cancel"
         ),
-        "send_video": "📤 Send a video or a link to it (YouTube, VK, TikTok, Vimeo and other sites).",
+        "send_video": "📤 Send a video or a link to it: YouTube, VK, TikTok, Vimeo, Google Drive and other sites.",
         "not_a_video": "⚠️ That doesn't look like a video. Please send a video file.",
         "too_big": "⚠️ The file is too large ({size_mb} MB): Telegram lets bots download at most {max_mb} MB.\n\n💡 Send a link to the video instead — that works for big files too.",
         "too_long": "⚠️ The video is too long ({minutes} min). The limit is {max_min} min.",
@@ -259,6 +266,13 @@ TEXTS: dict[str, dict[str, str]] = {
         "link_private": "⚠️ The video is private or age-restricted — it can't be downloaded without signing in.",
         "link_unavailable": "⚠️ The video was not found or has been removed. Check the link.",
         "link_failed": "⚠️ Couldn't download the video from the link. Try again or send the file.",
+        "link_drive_private": (
+            "⚠️ Google Drive won't hand out the file. Share it: in Google Drive click the file → "
+            "<b>Share</b> → \"General access\" → <b>Anyone with the link</b>, then send the link again.\n\n"
+            "If it's already shared, the file may have hit Google's daily download limit — try again later."
+        ),
+        "link_drive_folder": "⚠️ That's a folder link. Send a link to the video file itself (click the file → Share → Copy link).",
+        "link_not_video": "⚠️ The link doesn't point to a video file. Send a link to a video.",
         "link_playlist": "⚠️ That's a playlist. Send a link to a single video.",
         "link_live": "⚠️ That's a live stream — it can't be translated while it's live.",
         "link_too_big": "⚠️ The linked video is larger than {max_mb} MB — that's too much.",
@@ -347,7 +361,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "🎙📝 <b>Озвучення + субтитри</b> — і те, і інше.\n\n"
             "Команди: /start, /menu, /language, /cancel"
         ),
-        "send_video": "📤 Надішліть відео або посилання на нього (YouTube, TikTok, Vimeo та інші сайти).",
+        "send_video": "📤 Надішліть відео або посилання на нього: YouTube, TikTok, Vimeo, Google Drive та інші сайти.",
         "not_a_video": "⚠️ Це не схоже на відео. Надішліть відеофайл.",
         "too_big": "⚠️ Файл завеликий ({size_mb} МБ): Telegram дозволяє боту завантажити максимум {max_mb} МБ.\n\n💡 Надішліть замість файлу посилання на відео — так можна й великі файли.",
         "too_long": "⚠️ Відео задовге ({minutes} хв). Максимум — {max_min} хв.",
@@ -412,6 +426,13 @@ TEXTS: dict[str, dict[str, str]] = {
         "link_private": "⚠️ Відео закрите або з віковим обмеженням — його не завантажити без входу в акаунт.",
         "link_unavailable": "⚠️ Відео не знайдено або видалено. Перевірте посилання.",
         "link_failed": "⚠️ Не вдалося завантажити відео за посиланням. Спробуйте ще раз або надішліть файл.",
+        "link_drive_private": (
+            "⚠️ Google Drive не віддає файл. Відкрийте доступ: у Google Drive натисніть на файл → "
+            "<b>Поділитися</b> → «Загальний доступ» → <b>Усі, хто має посилання</b>, і надішліть посилання ще раз.\n\n"
+            "Якщо доступ уже відкрито, у файлу міг закінчитися денний ліміт завантажень Google — спробуйте пізніше."
+        ),
+        "link_drive_folder": "⚠️ Це посилання на папку. Надішліть посилання на сам відеофайл (натисніть на файл → Поділитися → Копіювати посилання).",
+        "link_not_video": "⚠️ За посиланням не відеофайл. Надішліть посилання на відео.",
         "link_playlist": "⚠️ Це плейлист. Надішліть посилання на одне відео.",
         "link_live": "⚠️ Це пряма трансляція — її не можна перекласти, поки вона триває.",
         "link_too_big": "⚠️ Відео за посиланням більше {max_mb} МБ — це забагато.",
