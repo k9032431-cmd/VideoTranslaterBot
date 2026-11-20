@@ -84,11 +84,11 @@ async def download(
     async with _session() as http:
         for attempt in range(1, ATTEMPTS + 1):
             try:
-                headers = {"Range": f"bytes={done}-"} if done else {}
+                headers = {"Range": f"bytes={done}-"} if done else {}  # resume after a dropped connection
                 async with http.get(url, headers=headers) as resp:
                     if resp.headers.get("Content-Type", "").startswith("text/html"):
                         raise ValueError("private")
-                    if done and resp.status != 206:  # server ignored the range: start over
+                    if done and resp.status != 206:  # the server ignored the range: start over
                         done = 0
                     with dest.open("ab" if done else "wb") as out:
                         async for chunk in resp.content.iter_chunked(CHUNK):

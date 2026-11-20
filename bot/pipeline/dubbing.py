@@ -1,6 +1,8 @@
 """Voice-over: synthesize every translated line and place it on a timeline in sync with the video."""
 
 import asyncio
+import logging
+import re
 import wave
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -12,6 +14,8 @@ from openai import AsyncOpenAI
 from ..languages import Language
 from . import media
 from .models import Segment
+
+log = logging.getLogger(__name__)
 
 TTS_CONCURRENCY = 4
 TTS_ATTEMPTS = 3
@@ -70,8 +74,22 @@ async def _openai_tts(client: AsyncOpenAI, model: str, voice: str, text: str, ta
 _TURKMEN_TO_TURKISH = str.maketrans({"ä": "e", "Ä": "E", "ň": "n", "Ň": "N", "ý": "y", "Ý": "Y", "ž": "j", "Ž": "J"})
 
 
+# Sound notes are for subtitles, not for the narrator: "(музыка)", "[смех]", "♪ la la ♪".
+_SOUND_NOTES = re.compile(r"\([^)]*\)|\[[^\]]*\]|\*[^*]*\*|♪[^♪]*♪|[♪♫]")
+
+
 def speakable(text: str, lang: Language) -> str:
+    """What the narrator should say; "" when there is nothing to say."""
+    text = " ".join(_SOUND_NOTES.sub(" ", text).split())
+    if not any(ch.isalnum() for ch in text):
+        return ""
     return text.translate(_TURKMEN_TO_TURKISH) if lang.code == "tk" else text
+
+
+def _retryable(exc: Exception) -> bool:
+    from openai import APIConnectionError, APITimeoutError, InternalServerError
+
+    return isinstance(exc, (APIConnectionError, APITimeoutError, InternalServerError))
 
 
 async def _edge_tts(voice: str, text: str, out: Path) -> None:
@@ -98,37 +116,51 @@ async def synthesize(
     done = 0
     lock = asyncio.Lock()
 
-    async def one(index: int, seg: Segment) -> Path:
-        nonlocal done
+    failed = 0
+
+    async def one(index: int, seg: Segment) -> Path | None:
+        nonlocal done, failed
         raw = tts_dir / f"{index:05d}.mp3"
         voice = segment_voices[index]
-        async with semaphore:
-            for attempt in range(1, TTS_ATTEMPTS + 1):
-                try:
-                    if engine == "edge":
-                        await _edge_tts(voice, speakable(seg.translation, target), raw)
-                    else:
-                        await _openai_tts(client, model, voice, seg.translation, target, raw)
-                    break
-                except Exception:
-                    # The OpenAI client retries on its own; Edge occasionally drops a connection.
-                    if engine != "edge" or attempt == TTS_ATTEMPTS:
-                        raise
-                    await asyncio.sleep(2 * attempt)
+        text = speakable(seg.translation, target)
+        result: Path | None = None
+        if text:
+            async with semaphore:
+                for attempt in range(1, TTS_ATTEMPTS + 1):
+                    try:
+                        if engine == "edge":
+                            await _edge_tts(voice, text, raw)
+                        else:
+                            await _openai_tts(client, model, voice, text, target, raw)
+                        result = raw
+                        break
+                    except Exception as exc:
+                        if engine == "openai" and not _retryable(exc):
+                            raise  # a bad key or an empty balance won't fix itself
+                        if attempt == TTS_ATTEMPTS:
+                            # One unvoiceable line must not sink a whole film: leave a pause there.
+                            log.warning("Could not voice line %d %r: %s", index, text[:60], exc)
+                            failed += 1
+                        else:
+                            await asyncio.sleep(2 * attempt)
         async with lock:
             done += 1
             await on_progress(done / len(segments) * 0.9)
-        return raw
+        return result
 
     raw_clips = await asyncio.gather(*(one(i, s) for i, s in enumerate(segments)))
+    if failed and failed == sum(1 for s in segments if speakable(s.translation, target)):
+        raise RuntimeError("the voice service did not return audio for any line")
 
-    lengths = [await media.duration(p) for p in raw_clips]
+    lengths = [await media.duration(p) if p else 0.0 for p in raw_clips]
     plan = plan_timeline([s.start for s in segments], lengths, [s.end for s in segments])
 
     track_raw = work_dir / "dub.pcm"
     written = 0.0
     with track_raw.open("wb") as out:
         for index, (clip, place) in enumerate(zip(raw_clips, plan)):
+            if clip is None:  # nothing was said here: the gap before the next line covers it
+                continue
             wav = tts_dir / f"{index:05d}.wav"
             await media.to_wav(clip, wav, tempo=place.tempo)
             frames = _wav_frames(wav)

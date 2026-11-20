@@ -166,3 +166,35 @@ async def test_free_voice_with_edge_tts(tmp_path: Path, monkeypatch):
 
 async def _no_sleep(_):
     pass
+
+
+async def test_a_line_the_voice_cannot_say_does_not_break_the_video(tmp_path, monkeypatch):
+    """Edge returns no audio for some lines ("♪", "..."); the film must still come out."""
+    video = tmp_path / "in.mp4"
+    _make_video(video)
+    work = tmp_path / "work"
+    work.mkdir()
+    client = FakeOpenAI(tmp_path, segments=[
+        SimpleNamespace(start=0.5, end=2.0, text="Привет!", no_speech_prob=0.01, avg_logprob=-0.2, compression_ratio=1.2),
+        SimpleNamespace(start=2.5, end=3.5, text="Ну и ну.", no_speech_prob=0.01, avg_logprob=-0.2, compression_ratio=1.2),
+    ])
+    calls = []
+
+    class FlakyCommunicate:
+        def __init__(self, text, voice):
+            self.text = text
+            calls.append(text)
+
+        async def save(self, path):
+            if "Ну и ну" in self.text:
+                raise RuntimeError("No audio was received")
+            Path(path).write_bytes(client.tts_sample.read_bytes())
+
+    async def instant(_):
+        pass
+
+    monkeypatch.setattr(dubbing.edge_tts, "Communicate", FlakyCommunicate)
+    monkeypatch.setattr(dubbing.asyncio, "sleep", instant)
+    result = await run_job(client, _config(tmp_path, "edge"), JobParams(video, work, "ru", "en", "voice"), _report)
+    assert result.video and result.video.exists()
+    assert calls.count("EN: Ну и ну.") == dubbing.TTS_ATTEMPTS  # retried, then left as a pause

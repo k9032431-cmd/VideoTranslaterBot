@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from aiogram import Bot
-from aiogram.exceptions import TelegramBadRequest
+from aiogram.exceptions import TelegramAPIError, TelegramBadRequest
 from aiogram.types import FSInputFile
 from openai import APIError, AsyncOpenAI, AuthenticationError, RateLimitError
 
@@ -183,23 +183,30 @@ class JobManager:
         limit = self.config.max_upload_bytes
         caption = t(lang, "done", source=result.source.label, target=target.label)
         sent_video = False
+        links = self.files is not None and self.files.enabled
         if result.video:
             size = result.video.stat().st_size
             if size <= limit:
                 info = await media.probe(result.video)
                 vstream = next((s for s in info["streams"] if s.get("codec_type") == "video"), {})
-                await self.bot.send_video(
-                    req.chat_id,
-                    FSInputFile(result.video, filename=f"{Path(req.file_name).stem}_{target.code}.mp4"),
-                    caption=caption,
-                    duration=int(float(info["format"].get("duration", 0))),
-                    width=vstream.get("width"),
-                    height=vstream.get("height"),
-                    supports_streaming=True,
-                    request_timeout=UPLOAD_TIMEOUT,
-                )
-                sent_video = True
-            elif self.files and self.files.enabled:
+                try:
+                    await self.bot.send_video(
+                        req.chat_id,
+                        FSInputFile(result.video, filename=f"{Path(req.file_name).stem}_{target.code}.mp4"),
+                        caption=caption,
+                        duration=int(float(info["format"].get("duration", 0))),
+                        width=vstream.get("width"),
+                        height=vstream.get("height"),
+                        supports_streaming=True,
+                        request_timeout=UPLOAD_TIMEOUT,
+                    )
+                    sent_video = True
+                except TelegramAPIError:
+                    if not links:
+                        raise
+                    # Telegram refused or the upload broke off: the link below still delivers the video.
+                    log.warning("Sending the video to Telegram failed, sending a link instead", exc_info=True)
+            if not sent_video and links:
                 # Too big for Telegram: hand out a temporary link from our own server instead.
                 link = self.files.publish(result.video, f"{Path(req.file_name).stem}_{target.code}.mp4")
                 await self.bot.send_message(
@@ -209,7 +216,7 @@ class JobManager:
                     disable_web_page_preview=True,
                 )
                 sent_video = True
-            else:
+            elif not sent_video:
                 await self.bot.send_message(
                     req.chat_id,
                     t(lang, "result_too_big", size_mb=size // (1024 * 1024), max_mb=limit // (1024 * 1024)),
@@ -230,8 +237,11 @@ class JobManager:
 
 
 def _describe(exc: Exception, lang: str) -> str:
+    """A short, honest reason: it is what the user sends back when asking for help."""
     if isinstance(exc, APIError):
         return f"OpenAI: {exc.message}"[:300]
+    lines = [line for line in str(exc).strip().splitlines() if line.strip()]
+    detail = lines[-1][:200] if lines else ""
     if isinstance(exc, media.MediaError):
-        return "ffmpeg"
-    return t(lang, "error_generic")
+        return f"ffmpeg: {detail}" if detail else "ffmpeg"
+    return f"{t(lang, 'error_generic')} ({type(exc).__name__}{': ' + detail if detail else ''})"

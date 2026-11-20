@@ -102,4 +102,5 @@ async def test_job_reports_errors(tmp_path: Path, monkeypatch):
     manager = JobManager(bot, _config(tmp_path), FakeOpenAI(tmp_path))
     manager.start(_request())
     await manager.running[1]
-    assert bot.edits()[-1] == t("ru", "error", error=t("ru", "error_generic"))
+    # the reason is shown, so the user can tell what went wrong
+    assert bot.edits()[-1] == t("ru", "error", error=t("ru", "error_generic") + " (RuntimeError: boom)")

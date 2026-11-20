@@ -262,3 +262,16 @@ def test_video_length_limit(tmp_path):
     assert not unlimited.too_long(10 * 3600)  # 0 = no limit, even for a 10-hour video
     limited = replace(_config(tmp_path), max_video_minutes=180)
     assert limited.too_long(180 * 60) and not limited.too_long(179 * 60) and not limited.too_long(None)
+
+
+def test_non_speech_lines_are_dropped_and_sound_notes_not_voiced():
+    from bot.pipeline.dubbing import speakable
+    from bot.pipeline.transcribe import _keep
+    ru = languages.get("ru")
+    for noise in ("♪", "...", "-", "♪ ♪", "(музыка)", "[смех]"):
+        assert speakable(noise, ru) == ""
+    assert speakable("[смех] Ну ты даёшь! ♪ ля-ля ♪", ru) == "Ну ты даёшь!"
+    seg = SimpleNamespace(text=" ♪ ", no_speech_prob=0.0, avg_logprob=-0.1, compression_ratio=1.0)
+    assert not _keep(seg)
+    seg.text = "Привет"
+    assert _keep(seg)

@@ -54,7 +54,7 @@ async def fake_drive(monkeypatch):
                     "Content-Type": "video/mp4", "Content-Range": f"bytes 0-0/{len(VIDEO)}",
                     "Content-Disposition": "attachment; filename*=UTF-8''%D0%A4%D0%B8%D0%BB%D1%8C%D0%BC.mp4",
                 })
-        resp = web.StreamResponse(status=206 if start else 200, headers={
+        resp = web.StreamResponse(status=206 if request.headers.get("Range") else 200, headers={
             "Content-Type": "video/mp4", "Content-Length": str(len(VIDEO) - start),
         })
         await resp.prepare(request)
@@ -117,5 +117,6 @@ async def test_download_resumes_after_dropped_connection(tmp_path, fake_drive):
     assert path.name == "source.mp4"
     assert path.read_bytes() == VIDEO  # complete and in order despite the break
     resumed = [r for r in fake_drive["requests"] if r and r != "bytes=0-0"]
-    assert resumed and int(resumed[0].removeprefix("bytes=").rstrip("-")) > 0
+    assert resumed and int(resumed[0].removeprefix("bytes=").rstrip("-")) > 0  # continued, not restarted
     assert progress[-1] == 1.0
+

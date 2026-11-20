@@ -25,7 +25,12 @@ def _keep(seg: object) -> bool:
         return False
     if compression > MAX_COMPRESSION_RATIO:
         return False
-    return bool((getattr(seg, "text", "") or "").strip())
+    # "♪", "...", "-": music or noise written as symbols — nothing to translate or voice.
+    return has_words(getattr(seg, "text", "") or "")
+
+
+def has_words(text: str) -> bool:
+    return any(ch.isalnum() for ch in text)
 
 
 async def transcribe(
